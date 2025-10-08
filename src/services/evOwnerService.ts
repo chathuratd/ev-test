@@ -4,7 +4,10 @@ import {
   ApiResponse, 
   RegisterEVOwnerRequestDto, 
   EVOwnerLoginRequestDto,
-  AuthData
+  AuthData,
+  CreateBookingRequestDto,
+  Booking,
+  ChargingStation
 } from '../types';
 
 export const evOwnerService = {
@@ -38,37 +41,9 @@ export const evOwnerService = {
   // Legacy methods for backward compatibility
   async getAllEVOwnersLegacy(): Promise<EVOwner[]> {
     // Since there's no "get all EV owners" endpoint in the swagger, 
-    // we'll return mock data for demonstration
-    const mockData: EVOwner[] = [
-      {
-        NIC: '123456789V',
-        FirstName: 'John',
-        LastName: 'Doe',
-        Email: 'john.doe@email.com',
-        PhoneNumber: '+94771234567',
-        FullName: 'John Doe',
-        CreatedAt: '2025-10-01T10:00:00Z',
-      },
-      {
-        NIC: '987654321V',
-        FirstName: 'Jane',
-        LastName: 'Smith',
-        Email: 'jane.smith@email.com',
-        PhoneNumber: '+94779876543',
-        FullName: 'Jane Smith',
-        CreatedAt: '2025-10-02T14:30:00Z',
-      },
-      {
-        NIC: '456789123V',
-        FirstName: 'Michael',
-        LastName: 'Johnson',
-        Email: 'michael.johnson@email.com',
-        PhoneNumber: '+94774567891',
-        FullName: 'Michael Johnson',
-        CreatedAt: '2025-10-03T09:15:00Z',
-      },
-    ];
-    return mockData;
+    // this method is not supported. Return empty array.
+    console.warn('getAllEVOwnersLegacy: No API endpoint available for getting all EV owners');
+    return [];
   },
 
   async getEVOwnerByNicLegacy(_nic: string): Promise<EVOwner | null> {
@@ -99,5 +74,73 @@ export const evOwnerService = {
     };
 
     return await this.loginEVOwnerDirect(loginRequest);
+  },
+
+  // Bookings Management
+  async createBooking(bookingData: CreateBookingRequestDto): Promise<ApiResponse<Booking>> {
+    try {
+      const response = await apiClient.post<ApiResponse<Booking>>('/Bookings', bookingData);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.Message || 'Failed to create booking');
+    }
+  },
+
+  async getUserBookings(nic: string): Promise<Booking[]> {
+    try {
+      const response = await apiClient.get<ApiResponse<Booking[]>>(`/api/v1/Booking/evowner/${nic}`);
+      if (response.data.Success && response.data.Data) {
+        return response.data.Data;
+      }
+      return [];
+    } catch (error: any) {
+      console.error('Failed to fetch user bookings:', error);
+      throw new Error(error.response?.data?.Message || 'Failed to fetch user bookings');
+    }
+  },
+
+  async cancelBooking(bookingId: string): Promise<ApiResponse<any>> {
+    try {
+      const response = await apiClient.delete<ApiResponse<any>>(`/Bookings/${bookingId}`);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.Message || 'Failed to cancel booking');
+    }
+  },
+
+  // Dashboard Statistics
+  // Dashboard Statistics - calculated from real user data
+  async getDashboardStats(nic: string): Promise<any> {
+    try {
+      // Get user's actual bookings
+      const userBookings = await this.getUserBookings(nic);
+      
+      // Calculate stats from real data
+      const now = new Date();
+      const pendingReservations = userBookings.filter(b => b.Status === 'Pending').length;
+      const approvedReservations = userBookings.filter(b => 
+        b.Status === 'Confirmed' && new Date(b.ReservationDateTime) > now
+      ).length;
+      
+      // Get recent bookings (last 5)
+      const sortedBookings = userBookings.sort((a, b) => 
+        new Date(b.CreatedAt || '').getTime() - new Date(a.CreatedAt || '').getTime()
+      );
+      const recentBookings = sortedBookings.slice(0, 5).map(booking => ({
+        id: booking.Id,
+        stationId: booking.ChargingStationId,
+        date: booking.ReservationDateTime.split('T')[0],
+        status: booking.Status
+      }));
+      
+      return {
+        pendingReservations,
+        approvedReservations,
+        totalBookings: userBookings.length,
+        recentBookings
+      };
+    } catch (error: any) {
+      throw new Error('Failed to fetch dashboard stats');
+    }
   }
 };

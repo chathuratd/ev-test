@@ -1,7 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
+import EVOwnerProtectedRoute from './components/common/EVOwnerProtectedRoute';
 import MainLayout from './components/layout/MainLayout';
+import EVOwnerLayout from './components/layout/EVOwnerLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import StationsPage from './pages/StationsPage';
@@ -11,6 +13,10 @@ import EVOwnersPage from './pages/EVOwnersPage';
 import BookingsPage from './pages/BookingsPage';
 import EVOwnerLoginPage from './pages/EVOwnerLoginPage';
 import EVOwnerRegisterPage from './pages/EVOwnerRegisterPage';
+import EVOwnerDashboardPage from './pages/EVOwnerDashboardPage';
+import EVOwnerStationsPage from './pages/EVOwnerStationsPage';
+import EVOwnerBookingsPage from './pages/EVOwnerBookingsPage';
+import EVOwnerBookStationPage from './pages/EVOwnerBookStationPage';
 
 function App() {
   return (
@@ -20,7 +26,32 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/ev-owner-login" element={<EVOwnerLoginPage />} />
           <Route path="/ev-owner-register" element={<EVOwnerRegisterPage />} />
+          
+          {/* EV Owner Protected Routes */}
+          <Route 
+            path="/ev-owner-dashboard" 
+            element={
+              <EVOwnerProtectedRoute>
+                <EVOwnerLayout />
+              </EVOwnerProtectedRoute>
+            }
+          >
+            <Route index element={<EVOwnerDashboardPage />} />
+          </Route>
+          <Route 
+            path="/ev-owner" 
+            element={
+              <EVOwnerProtectedRoute>
+                <EVOwnerLayout />
+              </EVOwnerProtectedRoute>
+            }
+          >
+            <Route path="stations" element={<EVOwnerStationsPage />} />
+            <Route path="bookings" element={<EVOwnerBookingsPage />} />
+            <Route path="book-station" element={<EVOwnerBookStationPage />} />
+          </Route>
 
+          {/* Admin Protected Routes */}
           <Route
             path="/"
             element={
