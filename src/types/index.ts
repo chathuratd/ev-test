@@ -86,7 +86,7 @@ export enum DayOfWeek {
 export interface OperatingHoursDto {
   OpenTime: string;
   CloseTime: string;
-  Is24Hours: boolean;
+  Is24Hours?: boolean;
   ClosedDays?: DayOfWeek[];
 }
 
@@ -105,7 +105,7 @@ export interface ChargingStation {
   PricePerHour: number;
   PowerOutput?: number;
   OperatorId?: string;
-  OperatingHours?: string;
+  OperatingHours?: OperatingHoursDto;
   OperatingHoursDto?: OperatingHoursDto;
   AssignedOperatorIds?: string[];
   Status?: string;
@@ -118,7 +118,7 @@ export interface CreateChargingStationRequestDto {
   Location: string;
   Latitude: number;
   Longitude: number;
-  ChargingType: ChargingType;
+  ChargingType?: ChargingType;
   Type: ChargingType;
   TotalSlots: number;
   AvailableSlots: number;
@@ -128,6 +128,8 @@ export interface CreateChargingStationRequestDto {
   PowerOutput?: number;
   OperatorId?: string;
   OperatingHours?: string;
+  OperatingHoursStart?: string;
+  OperatingHoursEnd?: string;
   OperatingHoursDto?: OperatingHoursDto;
   AssignedOperatorIds?: string[];
 }
