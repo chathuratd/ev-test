@@ -1,19 +1,22 @@
-import apiClient from './api';
 import { DashboardStats, RecentBooking, StationUtilization } from '../types';
+import { MOCK_DASHBOARD_STATS, MOCK_RECENT_BOOKINGS, MOCK_STATION_UTILIZATION } from '../data/mockData';
 
 export const dashboardService = {
   async getStats(): Promise<DashboardStats> {
-    const response = await apiClient.get<DashboardStats>('/dashboard/stats');
-    return response.data;
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return MOCK_DASHBOARD_STATS;
   },
 
   async getRecentBookings(): Promise<RecentBooking[]> {
-    const response = await apiClient.get<RecentBooking[]>('/dashboard/recent-bookings');
-    return response.data;
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return MOCK_RECENT_BOOKINGS;
   },
 
   async getStationUtilization(): Promise<StationUtilization[]> {
-    const response = await apiClient.get<StationUtilization[]>('/dashboard/station-utilization');
-    return response.data;
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 400));
+    return MOCK_STATION_UTILIZATION;
   },
 };

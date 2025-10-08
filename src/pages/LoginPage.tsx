@@ -22,7 +22,7 @@ const LoginPage: React.FC = () => {
       login(response.token, response.user);
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid username or password');
+      setError(err.message || 'Invalid username or password');
     } finally {
       setLoading(false);
     }
