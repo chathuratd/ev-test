@@ -10,7 +10,7 @@ const EVOwnerLoginPage = () => {
     NIC: '',
     Password: ''
   });
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
@@ -25,7 +25,7 @@ const EVOwnerLoginPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setErrors({});
     setLoading(true);
 
     try {
@@ -33,20 +33,63 @@ const EVOwnerLoginPage = () => {
       if (response.Success && response.Data) {
         // Store the auth data
         authService.storeTokenData(response.Data);
-        alert('Login successful! Welcome to EV Network.');
-        // Redirect to a dashboard for EV owners (you might want to create this)
+        
+        // Store EV Owner information for dashboard access
+        localStorage.setItem('evOwnerNic', formData.NIC);
+        localStorage.setItem('userNic', formData.NIC);
+        
+        // If user data is available, store it for better UX
+        if (response.Data.User) {
+          localStorage.setItem('evOwnerName', response.Data.User.FullName || `${response.Data.User.FirstName} ${response.Data.User.LastName}`);
+        }
+        
+        // Redirect to EV Owner dashboard
         navigate('/ev-owner-dashboard');
       } else {
-        setError(response.Message || 'Login failed');
+        setErrors({ general: response.Message || 'Login failed' });
       }
     } catch (err: any) {
       console.error('Login error:', err);
-      if (err.response?.data?.Message) {
-        setError(err.response.data.Message);
+      
+      // Handle different error response formats
+      if (err.response?.data) {
+        const errorData = err.response.data;
+        
+        // Handle validation errors
+        if (err.response.status === 400 && errorData.errors) {
+          const backendErrors = errorData.errors;
+          const newErrors: Record<string, string> = {};
+          
+          Object.keys(backendErrors).forEach(key => {
+            const errorMessages = backendErrors[key];
+            if (Array.isArray(errorMessages) && errorMessages.length > 0) {
+              newErrors[key] = errorMessages[0];
+            }
+          });
+          
+          if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+          } else {
+            setErrors({ general: 'Invalid credentials. Please check your NIC and password.' });
+          }
+        }
+        // Handle other error formats
+        else if (errorData.message) {
+          setErrors({ general: errorData.message });
+        }
+        else if (errorData.Message) {
+          setErrors({ general: errorData.Message });
+        }
+        else if (errorData.success === false && errorData.message) {
+          setErrors({ general: errorData.message });
+        }
+        else {
+          setErrors({ general: 'Login failed. Please check your credentials.' });
+        }
       } else if (err.message) {
-        setError(err.message);
+        setErrors({ general: err.message });
       } else {
-        setError('Login failed. Please check your credentials.');
+        setErrors({ general: 'Login failed. Please check your credentials.' });
       }
     } finally {
       setLoading(false);
@@ -68,9 +111,9 @@ const EVOwnerLoginPage = () => {
           <h2 className="text-xl font-semibold text-white mb-2">EV Owner Sign In</h2>
           <p className="text-gray-400 text-sm mb-6">Enter your NIC and password to access your account</p>
 
-          {error && (
+          {errors.general && (
             <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg mb-4">
-              {error}
+              {errors.general}
             </div>
           )}
 

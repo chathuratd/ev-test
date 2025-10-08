@@ -14,11 +14,76 @@ const EVOwnerRegisterPage = () => {
     Password: '',
     ConfirmPassword: ''
   });
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
+
+  // Validation function that matches backend validation exactly
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    // NIC validation - match backend regex exactly
+    if (!formData.NIC) {
+      newErrors.NIC = 'NIC is required';
+    } else if (!/^[0-9]{9}[vVxX]$|^[0-9]{12}$/.test(formData.NIC)) {
+      newErrors.NIC = 'NIC must be in valid Sri Lankan format (9 digits followed by V/X or 12 digits)';
+    }
+
+    // FirstName validation
+    if (!formData.FirstName) {
+      newErrors.FirstName = 'First name is required';
+    } else if (formData.FirstName.length > 50) {
+      newErrors.FirstName = 'First name cannot exceed 50 characters';
+    }
+
+    // LastName validation
+    if (!formData.LastName) {
+      newErrors.LastName = 'Last name is required';
+    } else if (formData.LastName.length > 50) {
+      newErrors.LastName = 'Last name cannot exceed 50 characters';
+    }
+
+    // Email validation
+    if (!formData.Email) {
+      newErrors.Email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.Email)) {
+      newErrors.Email = 'Email must be valid';
+    }
+
+    // Phone number validation - exactly 10 digits
+    if (!formData.PhoneNumber) {
+      newErrors.PhoneNumber = 'Phone number is required';
+    } else if (!/^[0-9]{10}$/.test(formData.PhoneNumber)) {
+      newErrors.PhoneNumber = 'Phone number must be 10 digits';
+    }
+
+    // Password validation
+    if (!formData.Password) {
+      newErrors.Password = 'Password is required';
+    } else {
+      if (formData.Password.length < 8) {
+        newErrors.Password = 'Password must be at least 8 characters';
+      } else if (!/[A-Z]/.test(formData.Password)) {
+        newErrors.Password = 'Password must contain at least one uppercase letter';
+      } else if (!/[a-z]/.test(formData.Password)) {
+        newErrors.Password = 'Password must contain at least one lowercase letter';
+      } else if (!/[0-9]/.test(formData.Password)) {
+        newErrors.Password = 'Password must contain at least one number';
+      }
+    }
+
+    // Confirm password validation
+    if (!formData.ConfirmPassword) {
+      newErrors.ConfirmPassword = 'Confirm password is required';
+    } else if (formData.Password !== formData.ConfirmPassword) {
+      newErrors.ConfirmPassword = 'Passwords do not match';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -26,20 +91,20 @@ const EVOwnerRegisterPage = () => {
       ...prev,
       [name]: value
     }));
+    
+    // Clear specific field error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-
-    // Validation
-    if (formData.Password !== formData.ConfirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (formData.Password.length < 8) {
-      setError('Password must be at least 8 characters long');
+    
+    // Clear all errors and validate form
+    setErrors({});
+    
+    if (!validateForm()) {
       return;
     }
 
@@ -51,16 +116,69 @@ const EVOwnerRegisterPage = () => {
         alert('Registration successful! You can now login.');
         navigate('/ev-owner-login');
       } else {
-        setError(response.Message || 'Registration failed');
+        setErrors({ general: response.Message || 'Registration failed' });
       }
     } catch (err: any) {
       console.error('Registration error:', err);
-      if (err.response?.data?.Message) {
-        setError(err.response.data.Message);
+      
+      // Handle different types of backend errors
+      if (err.response?.data) {
+        const errorData = err.response.data;
+        
+        // Handle validation errors with field-specific messages
+        if (err.response.status === 400 && errorData.errors) {
+          const backendErrors = errorData.errors;
+          const newErrors: Record<string, string> = {};
+          
+          // Map backend errors to frontend format
+          Object.keys(backendErrors).forEach(key => {
+            const errorMessages = backendErrors[key];
+            if (Array.isArray(errorMessages) && errorMessages.length > 0) {
+              newErrors[key] = errorMessages[0];
+            }
+          });
+          
+          if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+          } else {
+            setErrors({ general: errorData.message || 'Registration failed. Please check your details.' });
+          }
+        }
+        // Handle business logic errors (like NIC already exists)
+        else if (errorData.message) {
+          // Check if it's a NIC-specific error and display it under the NIC field
+          if (errorData.message.toLowerCase().includes('nic') && errorData.message.toLowerCase().includes('already exists')) {
+            setErrors({ NIC: errorData.message });
+          } else {
+            setErrors({ general: errorData.message });
+          }
+        }
+        // Handle other error message formats
+        else if (errorData.Message) {
+          // Check if it's a NIC-specific error
+          if (errorData.Message.toLowerCase().includes('nic') && errorData.Message.toLowerCase().includes('already exists')) {
+            setErrors({ NIC: errorData.Message });
+          } else {
+            setErrors({ general: errorData.Message });
+          }
+        }
+        // Handle success:false responses
+        else if (errorData.success === false && errorData.message) {
+          // Check if it's a NIC-specific error
+          if (errorData.message.toLowerCase().includes('nic') && errorData.message.toLowerCase().includes('already exists')) {
+            setErrors({ NIC: errorData.message });
+          } else {
+            setErrors({ general: errorData.message });
+          }
+        }
+        // Fallback for any other error structure
+        else {
+          setErrors({ general: 'Registration failed. Please try again.' });
+        }
       } else if (err.message) {
-        setError(err.message);
+        setErrors({ general: err.message });
       } else {
-        setError('Registration failed. Please try again.');
+        setErrors({ general: 'Registration failed. Please try again.' });
       }
     } finally {
       setLoading(false);
@@ -82,9 +200,9 @@ const EVOwnerRegisterPage = () => {
           <h2 className="text-xl font-semibold text-white mb-2">Register as EV Owner</h2>
           <p className="text-gray-400 text-sm mb-6">Fill in your details to create your account</p>
 
-          {error && (
+          {errors.general && (
             <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg mb-4">
-              {error}
+              {errors.general}
             </div>
           )}
 
@@ -99,10 +217,20 @@ const EVOwnerRegisterPage = () => {
                 name="NIC"
                 value={formData.NIC}
                 onChange={handleChange}
-                placeholder="Enter your NIC number"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="123456789V or 200012345678"
+                className={`w-full bg-zinc-800 border rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-1 ${
+                  errors.NIC 
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                    : 'border-zinc-700 focus:border-green-500 focus:ring-green-500'
+                }`}
                 required
               />
+              {errors.NIC && (
+                <p className="mt-1 text-sm text-red-400">{errors.NIC}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-500">
+                Old format: 9 digits + V/X (e.g., 123456789V) or New format: 12 digits (e.g., 200012345678)
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -117,9 +245,17 @@ const EVOwnerRegisterPage = () => {
                   value={formData.FirstName}
                   onChange={handleChange}
                   placeholder="First name"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  maxLength={50}
+                  className={`w-full bg-zinc-800 border rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-1 ${
+                    errors.FirstName 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                      : 'border-zinc-700 focus:border-green-500 focus:ring-green-500'
+                  }`}
                   required
                 />
+                {errors.FirstName && (
+                  <p className="mt-1 text-sm text-red-400">{errors.FirstName}</p>
+                )}
               </div>
               <div>
                 <label className="block text-gray-300 text-sm font-medium mb-2">
@@ -131,9 +267,17 @@ const EVOwnerRegisterPage = () => {
                   value={formData.LastName}
                   onChange={handleChange}
                   placeholder="Last name"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  maxLength={50}
+                  className={`w-full bg-zinc-800 border rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-1 ${
+                    errors.LastName 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                      : 'border-zinc-700 focus:border-green-500 focus:ring-green-500'
+                  }`}
                   required
                 />
+                {errors.LastName && (
+                  <p className="mt-1 text-sm text-red-400">{errors.LastName}</p>
+                )}
               </div>
             </div>
 
@@ -148,9 +292,16 @@ const EVOwnerRegisterPage = () => {
                 value={formData.Email}
                 onChange={handleChange}
                 placeholder="Enter your email"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                className={`w-full bg-zinc-800 border rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-1 ${
+                  errors.Email 
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                    : 'border-zinc-700 focus:border-green-500 focus:ring-green-500'
+                }`}
                 required
               />
+              {errors.Email && (
+                <p className="mt-1 text-sm text-red-400">{errors.Email}</p>
+              )}
             </div>
 
             <div>
@@ -163,10 +314,19 @@ const EVOwnerRegisterPage = () => {
                 name="PhoneNumber"
                 value={formData.PhoneNumber}
                 onChange={handleChange}
-                placeholder="+94771234567"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="0771234567"
+                maxLength={10}
+                className={`w-full bg-zinc-800 border rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-1 ${
+                  errors.PhoneNumber 
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                    : 'border-zinc-700 focus:border-green-500 focus:ring-green-500'
+                }`}
                 required
               />
+              {errors.PhoneNumber && (
+                <p className="mt-1 text-sm text-red-400">{errors.PhoneNumber}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-500">Enter 10 digit phone number (without +94)</p>
             </div>
 
             <div>
@@ -181,7 +341,11 @@ const EVOwnerRegisterPage = () => {
                   value={formData.Password}
                   onChange={handleChange}
                   placeholder="Create a strong password"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  className={`w-full bg-zinc-800 border rounded-lg px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:ring-1 ${
+                    errors.Password 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                      : 'border-zinc-700 focus:border-green-500 focus:ring-green-500'
+                  }`}
                   required
                 />
                 <button
@@ -192,6 +356,12 @@ const EVOwnerRegisterPage = () => {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+              {errors.Password && (
+                <p className="mt-1 text-sm text-red-400">{errors.Password}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-500">
+                Must be 8+ characters with uppercase, lowercase, and number
+              </p>
             </div>
 
             <div>
@@ -205,7 +375,11 @@ const EVOwnerRegisterPage = () => {
                   value={formData.ConfirmPassword}
                   onChange={handleChange}
                   placeholder="Confirm your password"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  className={`w-full bg-zinc-800 border rounded-lg px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:ring-1 ${
+                    errors.ConfirmPassword 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                      : 'border-zinc-700 focus:border-green-500 focus:ring-green-500'
+                  }`}
                   required
                 />
                 <button
@@ -216,6 +390,9 @@ const EVOwnerRegisterPage = () => {
                   {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+              {errors.ConfirmPassword && (
+                <p className="mt-1 text-sm text-red-400">{errors.ConfirmPassword}</p>
+              )}
             </div>
 
             <button
