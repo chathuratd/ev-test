@@ -19,9 +19,8 @@ const StationsPage: React.FC = () => {
     if (searchQuery) {
       const filtered = stations.filter(
         (station) =>
-          station.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          station.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          station.address.toLowerCase().includes(searchQuery.toLowerCase())
+          station.Name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          station.Location.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredStations(filtered);
     } else {
@@ -32,74 +31,10 @@ const StationsPage: React.FC = () => {
   const fetchStations = async () => {
     try {
       const data = await stationService.getAllStations();
-      setStations(data);
-      setFilteredStations(data);
+      setStations(data.Data);
+      setFilteredStations(data.Data);
     } catch (error) {
       console.error('Failed to fetch stations:', error);
-      const mockData: ChargingStation[] = [
-        {
-          id: '1',
-          name: 'Downtown Charging Hub',
-          location: 'Colombo 03',
-          address: '123 Galle Road, Colombo 03',
-          latitude: 6.9271,
-          longitude: 79.8612,
-          description: '24/7 charging facility',
-          chargingType: 'Both',
-          totalSlots: 8,
-          availableSlots: 5,
-          powerCapacity: '50KW DC / 22KW AC',
-          pricePerHour: 500,
-          operatingHours: { start: '00:00', end: '23:59' },
-          amenities: ['WiFi', 'Parking', 'Restroom'],
-          assignedOperators: ['OP001', 'OP002'],
-          status: 'active',
-          createdAt: '2024-01-01',
-          updatedAt: '2024-01-01',
-        },
-        {
-          id: '2',
-          name: 'Airport Express Station',
-          location: 'Katunayake',
-          address: 'Airport Road, Katunayake',
-          latitude: 7.1807,
-          longitude: 79.8842,
-          description: '24/7 express charging',
-          chargingType: 'DC',
-          totalSlots: 12,
-          availableSlots: 8,
-          powerCapacity: '150KW DC',
-          pricePerHour: 750,
-          operatingHours: { start: '00:00', end: '23:59' },
-          amenities: ['WiFi', 'Parking', 'Cafe'],
-          assignedOperators: ['OP003'],
-          status: 'active',
-          createdAt: '2024-01-01',
-          updatedAt: '2024-01-01',
-        },
-        {
-          id: '3',
-          name: 'Mall Parking Chargers',
-          location: 'Rajagiriya',
-          address: 'One Galle Face Mall, Rajagiriya',
-          latitude: 6.9105,
-          longitude: 79.8897,
-          description: 'Shopping mall parking',
-          chargingType: 'AC',
-          totalSlots: 6,
-          availableSlots: 6,
-          powerCapacity: '22KW AC',
-          pricePerHour: 400,
-          operatingHours: { start: '10:00', end: '22:00' },
-          amenities: ['WiFi', 'Parking', 'Shopping'],
-          assignedOperators: ['OP004'],
-          status: 'inactive',
-          createdAt: '2024-01-01',
-          updatedAt: '2024-01-01',
-        },
-      ];
-      setStations(mockData);
-      setFilteredStations(mockData);
     } finally {
       setLoading(false);
     }
@@ -162,78 +97,78 @@ const StationsPage: React.FC = () => {
                 <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Location</th>
                 <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Type</th>
                 <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Slots</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Power</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Price Per Hour</th>
                 <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Status</th>
                 <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredStations.map((station) => (
-                <tr key={station.id} className="border-b border-zinc-800 hover:bg-zinc-800/50">
+                <tr key={station.Id} className="border-b border-zinc-800 hover:bg-zinc-800/50">
                   <td className="py-4 px-4">
                     <div>
-                      <p className="text-white font-medium">{station.name}</p>
-                      <p className="text-gray-400 text-sm">{station.operatingHours.start === '00:00' && station.operatingHours.end === '23:59' ? '24/7' : `${station.operatingHours.start} - ${station.operatingHours.end}`}</p>
+                      <p className="text-white font-medium">{station.Name}</p>
+                      <p className="text-gray-400 text-sm">{station.OperatingHours?.OpenTime === '00:00' && station.OperatingHours?.CloseTime === '23:59' ? '24/7' : `${station.OperatingHours?.OpenTime} - ${station.OperatingHours?.CloseTime}`}</p>
                     </div>
                   </td>
                   <td className="py-4 px-4">
                     <div>
-                      <p className="text-white">{station.location}</p>
-                      <p className="text-gray-400 text-sm">{station.address}</p>
+                      <p className="text-white">{station.Location}</p>
+                      {/* <p className="text-gray-400 text-sm">{station.Address}</p> */}
                     </div>
                   </td>
                   <td className="py-4 px-4">
                     <span
                       className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${
-                        station.chargingType === 'DC'
+                        station.Type === 'DC'
                           ? 'bg-blue-500/10 border-blue-500/50 text-blue-400'
-                          : station.chargingType === 'AC'
+                          : station.Type === 'AC'
                           ? 'bg-purple-500/10 border-purple-500/50 text-purple-400'
                           : 'bg-green-500/10 border-green-500/50 text-green-400'
                       }`}
                     >
-                      {station.chargingType}
+                      {station.Type}
                     </span>
                   </td>
                   <td className="py-4 px-4">
                     <div>
                       <p className="text-white font-medium">
-                        {station.availableSlots} / {station.totalSlots}
+                        {station.AvailableSlots} / {station.TotalSlots}
                       </p>
                       <p className="text-gray-400 text-sm">available</p>
                     </div>
                   </td>
                   <td className="py-4 px-4">
-                    <p className="text-white">{station.powerCapacity}</p>
+                    <p className="text-white">{station.PricePerHour}</p>
                   </td>
                   <td className="py-4 px-4">
                     <span
                       className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-                        station.status === 'active'
+                        station.Status === 'active'
                           ? 'bg-green-500/10 text-green-400'
                           : 'bg-gray-500/10 text-gray-400'
                       }`}
                     >
-                      {station.status}
+                      {station.Status}
                     </span>
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => navigate(`/stations/${station.id}/edit`)}
+                        onClick={() => navigate(`/stations/${station.Id}/edit`)}
                         className="text-white hover:text-green-400 font-medium text-sm transition-colors"
                       >
                         Edit
                       </button>
                       <button
-                        onClick={() => handleActivateDeactivate(station.id, station.status)}
+                        onClick={() => handleActivateDeactivate(station.Id, station.Status as string)}
                         className={`font-medium text-sm transition-colors ${
-                          station.status === 'active'
+                          station.Status === 'active'
                             ? 'text-gray-400 hover:text-red-400'
                             : 'text-green-400 hover:text-green-300'
                         }`}
                       >
-                        {station.status === 'active' ? 'Deactivate' : 'Activate'}
+                        {station.Status === 'active' ? 'Deactivate' : 'Activate'}
                       </button>
                     </div>
                   </td>

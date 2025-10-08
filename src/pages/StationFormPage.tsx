@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { stationService } from '../services/stationService';
-import { ChargingStation } from '../types';
 
 const StationFormPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -12,21 +11,19 @@ const StationFormPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
+    id: '',
     name: '',
     location: '',
-    address: '',
     latitude: '',
     longitude: '',
     description: '',
-    chargingType: 'AC' as 'AC' | 'DC' | 'Both',
+    type: 'AC' as 'AC' | 'DC' | 'Both',
     totalSlots: '',
     availableSlots: '',
-    powerCapacity: '',
     pricePerHour: '',
     operatingHoursStart: '00:00',
     operatingHoursEnd: '23:59',
     amenities: [] as string[],
-    assignedOperators: [] as string[],
   });
 
   useEffect(() => {
@@ -38,22 +35,21 @@ const StationFormPage: React.FC = () => {
   const fetchStation = async () => {
     try {
       const station = await stationService.getStationById(id!);
+      console.log(station);
       setFormData({
-        name: station.name,
-        location: station.location,
-        address: station.address,
-        latitude: station.latitude.toString(),
-        longitude: station.longitude.toString(),
-        description: station.description || '',
-        chargingType: station.chargingType,
-        totalSlots: station.totalSlots.toString(),
-        availableSlots: station.availableSlots.toString(),
-        powerCapacity: station.powerCapacity,
-        pricePerHour: station.pricePerHour.toString(),
-        operatingHoursStart: station.operatingHours.start,
-        operatingHoursEnd: station.operatingHours.end,
-        amenities: station.amenities,
-        assignedOperators: station.assignedOperators,
+        id: station.Data.Id,
+        name: station.Data.Name,
+        location: station.Data.Location,
+        latitude: station.Data.Latitude.toString(),
+        longitude: station.Data.Longitude.toString(),
+        description: station.Data.Description || '',
+        type: station.Data.Type,
+        totalSlots: station.Data.TotalSlots.toString(),
+        availableSlots: station.Data.AvailableSlots.toString(),
+        pricePerHour: station.Data.PricePerHour.toString(),
+        operatingHoursStart: station.Data.OperatingHours?.OpenTime as string || '00:00',
+        operatingHoursEnd: station.Data.OperatingHours?.CloseTime as string || '23:59',
+        amenities: station.Data.Amenities as string[] || [],
       });
     } catch (error) {
       console.error('Failed to fetch station:', error);
@@ -66,30 +62,26 @@ const StationFormPage: React.FC = () => {
     setLoading(true);
 
     try {
-      const stationData: Partial<ChargingStation> = {
-        name: formData.name,
-        location: formData.location,
-        address: formData.address,
-        latitude: parseFloat(formData.latitude),
-        longitude: parseFloat(formData.longitude),
-        description: formData.description,
-        chargingType: formData.chargingType,
-        totalSlots: parseInt(formData.totalSlots),
-        availableSlots: parseInt(formData.availableSlots),
-        powerCapacity: formData.powerCapacity,
-        pricePerHour: parseFloat(formData.pricePerHour),
-        operatingHours: {
-          start: formData.operatingHoursStart,
-          end: formData.operatingHoursEnd,
-        },
-        amenities: formData.amenities,
-        assignedOperators: formData.assignedOperators,
+      const stationData = {
+        Id: id ?? '', // Ensure Id is always a string
+        Name: formData.name,
+        Location: formData.location,
+        Latitude: parseFloat(formData.latitude),
+        Longitude: parseFloat(formData.longitude),
+        Description: formData.description,
+        Type: formData.type as any,
+        TotalSlots: parseInt(formData.totalSlots),
+        AvailableSlots: parseInt(formData.availableSlots),
+        PricePerHour: parseFloat(formData.pricePerHour),
+        OperatingHoursStart: formData.operatingHoursStart,
+        OperatingHoursEnd: formData.operatingHoursEnd,
+        Amenities: formData.amenities,
       };
 
       if (isEdit) {
         await stationService.updateStation(id!, stationData);
       } else {
-        await stationService.createStation(stationData);
+        await stationService.createStation(stationData as any);
       }
 
       navigate('/stations');
@@ -175,7 +167,7 @@ const StationFormPage: React.FC = () => {
             </div>
           </div>
 
-          <div>
+          {/* <div>
             <label className="block text-gray-300 text-sm font-medium mb-2">
               Address <span className="text-red-400">*</span>
             </label>
@@ -187,7 +179,7 @@ const StationFormPage: React.FC = () => {
               required
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
             />
-          </div>
+          </div> */}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -239,7 +231,7 @@ const StationFormPage: React.FC = () => {
               </label>
               <select
                 name="chargingType"
-                value={formData.chargingType}
+                value={formData.type}
                 onChange={handleChange}
                 required
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-green-500"
@@ -281,22 +273,7 @@ const StationFormPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-gray-300 text-sm font-medium mb-2">
-                Power Capacity <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                name="powerCapacity"
-                value={formData.powerCapacity}
-                onChange={handleChange}
-                placeholder="e.g., 50KW DC / 22KW AC"
-                required
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-              />
-            </div>
-
+          <div className="grid grid-cols-1 gap-6">
             <div>
               <label className="block text-gray-300 text-sm font-medium mb-2">
                 Price per Hour (LKR) <span className="text-red-400">*</span>
