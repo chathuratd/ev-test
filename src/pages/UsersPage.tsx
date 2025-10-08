@@ -1,14 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Search } from 'lucide-react';
 import { userService } from '../services/userService';
-import { User } from '../types';
+import { User, UserRole, AccountStatus } from '../types';
 
-const UsersPage: React.FC = () => {
+const UsersPage = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -18,9 +17,9 @@ const UsersPage: React.FC = () => {
     if (searchQuery) {
       const filtered = users.filter(
         (user) =>
-          user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          user.email.toLowerCase().includes(searchQuery.toLowerCase())
+          user.Username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          user.FullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          user.Email.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredUsers(filtered);
     } else {
@@ -30,43 +29,66 @@ const UsersPage: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
-      const data = await userService.getAllUsers();
-      setUsers(data);
-      setFilteredUsers(data);
+      const response = await userService.getAllUsers();
+      if (response.Success && response.Data) {
+        setUsers(response.Data);
+        setFilteredUsers(response.Data);
+      } else {
+        console.error('Failed to fetch users:', response.Message);
+        setMockData();
+      }
     } catch (error) {
       console.error('Failed to fetch users:', error);
-      const mockData: User[] = [
-        {
-          id: '1',
-          username: 'admin',
-          name: 'Admin User',
-          email: 'admin@evstation.com',
-          role: 'backoffice',
-          status: 'active',
-        },
-        {
-          id: '2',
-          username: 'operator1',
-          name: 'John Operator',
-          email: 'john@evstation.com',
-          role: 'station_operator',
-          status: 'active',
-        },
-      ];
-      setUsers(mockData);
-      setFilteredUsers(mockData);
+      setMockData();
     } finally {
       setLoading(false);
     }
   };
 
+  const setMockData = () => {
+    const mockData: User[] = [
+      {
+        Id: '1',
+        Username: 'admin',
+        FirstName: 'System',
+        LastName: 'Administrator',
+        FullName: 'System Administrator',
+        Email: 'admin@evstation.com',
+        Role: UserRole.Backoffice,
+        Status: AccountStatus.Active,
+        AssignedStationIds: [],
+        LastLoginAt: new Date().toISOString(),
+      },
+      {
+        Id: '2',
+        Username: 'operator1',
+        FirstName: 'John',
+        LastName: 'Operator',
+        FullName: 'John Operator',
+        Email: 'john@evstation.com',
+        Role: UserRole.StationOperator,
+        Status: AccountStatus.Active,
+        AssignedStationIds: [],
+        LastLoginAt: new Date().toISOString(),
+      },
+    ];
+    setUsers(mockData);
+    setFilteredUsers(mockData);
+  };
+
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
-        await userService.deleteUser(id);
-        fetchUsers();
+        const response = await userService.deleteUser(id);
+        if (response.Success) {
+          fetchUsers();
+        } else {
+          console.error('Failed to delete user:', response.Message);
+          alert('Failed to delete user: ' + response.Message);
+        }
       } catch (error) {
         console.error('Failed to delete user:', error);
+        alert('Failed to delete user');
       }
     }
   };
@@ -99,7 +121,7 @@ const UsersPage: React.FC = () => {
             />
           </div>
           <button
-            onClick={() => setShowModal(true)}
+            onClick={() => alert('Add User modal not implemented yet')}
             className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-black font-semibold px-4 py-2 rounded-lg transition-colors ml-4"
           >
             <Plus className="w-5 h-5" />
@@ -121,30 +143,30 @@ const UsersPage: React.FC = () => {
             </thead>
             <tbody>
               {filteredUsers.map((user) => (
-                <tr key={user.id} className="border-b border-zinc-800 hover:bg-zinc-800/50">
+                <tr key={user.Id} className="border-b border-zinc-800 hover:bg-zinc-800/50">
                   <td className="py-4 px-4">
-                    <p className="text-white font-medium">{user.username}</p>
+                    <p className="text-white font-medium">{user.Username}</p>
                   </td>
                   <td className="py-4 px-4">
-                    <p className="text-white">{user.name}</p>
+                    <p className="text-white">{user.FullName}</p>
                   </td>
                   <td className="py-4 px-4">
-                    <p className="text-white">{user.email}</p>
+                    <p className="text-white">{user.Email}</p>
                   </td>
                   <td className="py-4 px-4">
                     <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-800 text-gray-300">
-                      {user.role === 'backoffice' ? 'backoffice' : 'station operator'}
+                      {user.Role === UserRole.Backoffice ? 'Backoffice' : 'Station Operator'}
                     </span>
                   </td>
                   <td className="py-4 px-4">
                     <span
                       className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-                        user.status === 'active'
+                        user.Status === AccountStatus.Active
                           ? 'bg-green-500/10 text-green-400'
                           : 'bg-gray-500/10 text-gray-400'
                       }`}
                     >
-                      {user.status}
+                      {user.Status}
                     </span>
                   </td>
                   <td className="py-4 px-4">
@@ -156,7 +178,7 @@ const UsersPage: React.FC = () => {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(user.id)}
+                        onClick={() => handleDelete(user.Id)}
                         className="text-red-400 hover:text-red-300 font-medium text-sm transition-colors"
                       >
                         Delete

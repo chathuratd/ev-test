@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
@@ -10,6 +9,8 @@ import StationFormPage from './pages/StationFormPage';
 import UsersPage from './pages/UsersPage';
 import EVOwnersPage from './pages/EVOwnersPage';
 import BookingsPage from './pages/BookingsPage';
+import EVOwnerLoginPage from './pages/EVOwnerLoginPage';
+import EVOwnerRegisterPage from './pages/EVOwnerRegisterPage';
 
 function App() {
   return (
@@ -17,6 +18,8 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/ev-owner-login" element={<EVOwnerLoginPage />} />
+          <Route path="/ev-owner-register" element={<EVOwnerRegisterPage />} />
 
           <Route
             path="/"

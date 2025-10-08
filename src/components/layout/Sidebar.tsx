@@ -1,10 +1,20 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
-import { Zap, LayoutDashboard, Users, Zap as StationIcon, Calendar, Shield } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { Zap, LayoutDashboard, Users, Zap as StationIcon, Calendar, Shield, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-const Sidebar: React.FC = () => {
-  const { user } = useAuth();
+const Sidebar = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      navigate('/login');
+    }
+  };
 
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -45,17 +55,26 @@ const Sidebar: React.FC = () => {
       </nav>
 
       <div className="p-4 border-t border-zinc-800">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
             <span className="text-black font-semibold text-sm">
-              {user?.name?.charAt(0).toUpperCase() || 'A'}
+              {user?.FullName?.charAt(0).toUpperCase() || user?.FirstName?.charAt(0).toUpperCase() || 'A'}
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white font-medium text-sm truncate">{user?.name || 'Admin User'}</p>
-            <p className="text-gray-400 text-xs truncate capitalize">{user?.role || 'Backoffice'}</p>
+            <p className="text-white font-medium text-sm truncate">
+              {user?.FullName || `${user?.FirstName} ${user?.LastName}` || 'Admin User'}
+            </p>
+            <p className="text-gray-400 text-xs truncate capitalize">{user?.Role || 'Backoffice'}</p>
           </div>
         </div>
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 w-full px-3 py-2 text-gray-400 hover:text-white hover:bg-zinc-800/50 rounded-lg transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="text-sm">Logout</span>
+        </button>
       </div>
     </div>
   );

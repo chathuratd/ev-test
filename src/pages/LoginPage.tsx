@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { Zap } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { authService } from '../services/authService';
+import { LoginRequestDto } from '../types';
 
-const LoginPage: React.FC = () => {
+const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,11 +18,18 @@ const LoginPage: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await authService.login({ username, password });
-      login(response.token, response.user);
+      const credentials: LoginRequestDto = { Username: username, Password: password };
+      await login(credentials);
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid username or password');
+      console.error('Login error:', err);
+      if (err.response?.data?.Message) {
+        setError(err.response.data.Message);
+      } else if (err.message) {
+        setError(err.message);
+      } else {
+        setError('Invalid username or password');
+      }
     } finally {
       setLoading(false);
     }
@@ -47,16 +54,10 @@ const LoginPage: React.FC = () => {
             <p className="text-gray-400 mb-3">Demo Credentials:</p>
             <div className="space-y-2">
               <div>
-                <p className="text-gray-500">Backoffice username:</p>
-                <p className="text-green-400 font-mono">backoffice</p>
+                <p className="text-gray-500">Admin username:</p>
+                <p className="text-green-400 font-mono">admin</p>
                 <p className="text-gray-500 mt-1">password:</p>
-                <p className="text-green-400 font-mono">password123</p>
-              </div>
-              <div className="mt-3">
-                <p className="text-gray-500">Operator username:</p>
-                <p className="text-green-400 font-mono">operator</p>
-                <p className="text-gray-500 mt-1">password:</p>
-                <p className="text-green-400 font-mono">password123</p>
+                <p className="text-green-400 font-mono">Admin123!</p>
               </div>
             </div>
           </div>
@@ -104,6 +105,19 @@ const LoginPage: React.FC = () => {
               {loading ? 'Signing In...' : 'Sign In'}
             </button>
           </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-gray-400 text-sm">
+              EV Owner?{' '}
+              <Link to="/ev-owner-login" className="text-green-400 hover:text-green-300 font-medium">
+                Sign in here
+              </Link>
+              {' or '}
+              <Link to="/ev-owner-register" className="text-green-400 hover:text-green-300 font-medium">
+                Register
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>
