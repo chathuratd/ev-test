@@ -4,10 +4,11 @@ import {
   ApiResponse, 
   RegisterEVOwnerRequestDto, 
   EVOwnerLoginRequestDto,
+  UpdateEVOwnerRequestDto,
   AuthData,
   CreateBookingRequestDto,
   Booking,
-  ChargingStation
+  EVOwnerQueryParams
 } from '../types';
 
 export const evOwnerService = {
@@ -18,6 +19,56 @@ export const evOwnerService = {
 
   async loginEVOwner(credentials: EVOwnerLoginRequestDto): Promise<ApiResponse<AuthData>> {
     const response = await apiClient.post<ApiResponse<AuthData>>('/EVOwners/login', credentials);
+    return response.data;
+  },
+
+  async getAllEVOwners(params?: EVOwnerQueryParams): Promise<ApiResponse<EVOwner[]>> {
+    const queryParams = new URLSearchParams();
+    
+    if (params?.page !== undefined) queryParams.append('page', params.page.toString());
+    if (params?.pageSize !== undefined) queryParams.append('pageSize', params.pageSize.toString());
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.searchTerm) queryParams.append('searchTerm', params.searchTerm);
+
+    const response = await apiClient.get<ApiResponse<EVOwner[]>>(`/EVOwners?${queryParams.toString()}`);
+    return response.data;
+  },
+
+  // New test endpoint for development/debugging
+  async getAllEVOwnersTest(params?: EVOwnerQueryParams): Promise<ApiResponse<EVOwner[]>> {
+    const queryParams = new URLSearchParams();
+    
+    if (params?.page !== undefined) queryParams.append('page', params.page.toString());
+    if (params?.pageSize !== undefined) queryParams.append('pageSize', params.pageSize.toString());
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.searchTerm) queryParams.append('searchTerm', params.searchTerm);
+
+    const response = await apiClient.get<ApiResponse<EVOwner[]>>(`/EVOwners/test?${queryParams.toString()}`);
+    return response.data;
+  },
+
+  async getCurrentEVOwner(): Promise<ApiResponse<EVOwner>> {
+    const response = await apiClient.get<ApiResponse<EVOwner>>('/EVOwners/me');
+    return response.data;
+  },
+
+  async updateCurrentEVOwner(updateData: UpdateEVOwnerRequestDto): Promise<ApiResponse<EVOwner>> {
+    const response = await apiClient.put<ApiResponse<EVOwner>>('/EVOwners/me', updateData);
+    return response.data;
+  },
+
+  async getEVOwnerByNic(nic: string): Promise<ApiResponse<EVOwner>> {
+    const response = await apiClient.get<ApiResponse<EVOwner>>(`/EVOwners/${nic}`);
+    return response.data;
+  },
+
+  async updateEVOwner(nic: string, updateData: UpdateEVOwnerRequestDto): Promise<ApiResponse<EVOwner>> {
+    const response = await apiClient.put<ApiResponse<EVOwner>>(`/EVOwners/${nic}`, updateData);
+    return response.data;
+  },
+
+  async deleteEVOwner(nic: string): Promise<ApiResponse<void>> {
+    const response = await apiClient.delete<ApiResponse<void>>(`/EVOwners/${nic}`);
     return response.data;
   },
 
@@ -38,19 +89,46 @@ export const evOwnerService = {
     throw new Error(response.Message || 'EV owner login failed');
   },
 
-  // Legacy methods for backward compatibility
   async getAllEVOwnersLegacy(): Promise<EVOwner[]> {
-    // Since there's no "get all EV owners" endpoint in the swagger, 
-    // this method is not supported. Return empty array.
-    console.warn('getAllEVOwnersLegacy: No API endpoint available for getting all EV owners');
-    return [];
+    const response = await this.getAllEVOwners();
+    return response.Success && response.Data ? response.Data : [];
   },
 
-  async getEVOwnerByNicLegacy(_nic: string): Promise<EVOwner | null> {
-    // Since there's no "get EV owner by NIC" endpoint in the swagger,
-    // we'll return null. You might need to implement this based on
-    // your specific requirements
-    return null;
+  // Test endpoint legacy method
+  async getAllEVOwnersTestLegacy(): Promise<EVOwner[]> {
+    const response = await this.getAllEVOwnersTest();
+    return response.Success && response.Data ? response.Data : [];
+  },
+
+  // Development helper method to try test endpoint first, then fallback to production
+  async getAllEVOwnersWithFallback(): Promise<EVOwner[]> {
+    try {
+      // Try test endpoint first (useful for development)
+      return await this.getAllEVOwnersTestLegacy();
+    } catch (error) {
+      console.warn('Test EV owners endpoint failed, trying production:', error);
+      return await this.getAllEVOwnersLegacy();
+    }
+  },
+
+  async getEVOwnerByNicLegacy(nic: string): Promise<EVOwner | null> {
+    try {
+      const response = await this.getEVOwnerByNic(nic);
+      return response.Success && response.Data ? response.Data : null;
+    } catch (error) {
+      console.warn(`Failed to fetch EV owner with NIC ${nic}:`, error);
+      return null;
+    }
+  },
+
+  async getCurrentEVOwnerLegacy(): Promise<EVOwner | null> {
+    try {
+      const response = await this.getCurrentEVOwner();
+      return response.Success && response.Data ? response.Data : null;
+    } catch (error) {
+      console.warn('Failed to fetch current EV owner:', error);
+      return null;
+    }
   },
 
   async registerEVOwnerLegacy(registration: any): Promise<EVOwner> {
@@ -76,10 +154,10 @@ export const evOwnerService = {
     return await this.loginEVOwnerDirect(loginRequest);
   },
 
-  // Bookings Management
+  // Bookings Management (using the existing booking service endpoints)
   async createBooking(bookingData: CreateBookingRequestDto): Promise<ApiResponse<Booking>> {
     try {
-      const response = await apiClient.post<ApiResponse<Booking>>('/Bookings', bookingData);
+      const response = await apiClient.post<ApiResponse<Booking>>('/Booking', bookingData);
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.Message || 'Failed to create booking');
@@ -88,7 +166,7 @@ export const evOwnerService = {
 
   async getUserBookings(nic: string): Promise<Booking[]> {
     try {
-      const response = await apiClient.get<ApiResponse<Booking[]>>(`/api/v1/Booking/evowner/${nic}`);
+      const response = await apiClient.get<ApiResponse<Booking[]>>(`/Booking/evowner/${nic}`);
       if (response.data.Success && response.data.Data) {
         return response.data.Data;
       }
@@ -99,16 +177,18 @@ export const evOwnerService = {
     }
   },
 
-  async cancelBooking(bookingId: string): Promise<ApiResponse<any>> {
+  async cancelBooking(bookingId: string, reason: string = 'Cancelled by user'): Promise<ApiResponse<any>> {
     try {
-      const response = await apiClient.delete<ApiResponse<any>>(`/Bookings/${bookingId}`);
+      const response = await apiClient.put<ApiResponse<any>>('/Booking/cancel', {
+        BookingId: bookingId,
+        CancellationReason: reason
+      });
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.Message || 'Failed to cancel booking');
     }
   },
 
-  // Dashboard Statistics
   // Dashboard Statistics - calculated from real user data
   async getDashboardStats(nic: string): Promise<any> {
     try {

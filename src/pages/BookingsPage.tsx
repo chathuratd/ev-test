@@ -52,58 +52,26 @@ const BookingsPage = () => {
         setStations(stationsResponse.Data);
       }
 
-      // Since there's no "get all bookings" endpoint, we'll use mock data
-      setMockBookings();
+      // Fetch all bookings using the new method
+      const bookingsResponse = await bookingService.getAllBookings();
+      if (bookingsResponse.Success && bookingsResponse.Data) {
+        setBookings(bookingsResponse.Data);
+        setFilteredBookings(bookingsResponse.Data);
+      } else {
+        console.warn('Bookings API returned no data:', bookingsResponse.Message);
+        setBookings([]);
+        setFilteredBookings([]);
+      }
     } catch (error) {
       console.error('Failed to fetch data:', error);
-      setMockBookings();
+      setBookings([]);
+      setFilteredBookings([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const setMockBookings = () => {
-    const mockData: Booking[] = [
-      {
-        Id: '1',
-        EvOwnerNic: '123456789V',
-        ChargingStationId: 'station-1',
-        SlotNumber: 1,
-        ReservationDateTime: '2025-10-09T10:00:00Z',
-        Status: BookingStatus.Pending,
-        CreatedAt: '2025-10-08T14:30:00Z',
-      },
-      {
-        Id: '2',
-        EvOwnerNic: '987654321V',
-        ChargingStationId: 'station-2',
-        SlotNumber: 2,
-        ReservationDateTime: '2025-10-09T14:00:00Z',
-        Status: BookingStatus.Confirmed,
-        CreatedAt: '2025-10-08T12:15:00Z',
-      },
-      {
-        Id: '3',
-        EvOwnerNic: '456789123V',
-        ChargingStationId: 'station-1',
-        SlotNumber: 3,
-        ReservationDateTime: '2025-10-08T16:00:00Z',
-        Status: BookingStatus.Completed,
-        CreatedAt: '2025-10-08T10:00:00Z',
-      },
-      {
-        Id: '4',
-        EvOwnerNic: '789123456V',
-        ChargingStationId: 'station-3',
-        SlotNumber: 1,
-        ReservationDateTime: '2025-10-07T18:00:00Z',
-        Status: BookingStatus.Cancelled,
-        CreatedAt: '2025-10-07T15:00:00Z',
-      },
-    ];
-    setBookings(mockData);
-    setFilteredBookings(mockData);
-  };
+
 
   const handleStatusChange = async (bookingId: string, newStatus: BookingStatus) => {
     try {

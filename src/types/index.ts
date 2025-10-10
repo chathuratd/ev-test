@@ -225,6 +225,13 @@ export interface EVOwnerLoginRequestDto {
   Password: string;
 }
 
+export interface UpdateEVOwnerRequestDto {
+  FirstName?: string;
+  LastName?: string;
+  Email?: string;
+  PhoneNumber?: string;
+}
+
 // Dashboard Types
 export interface DashboardStats {
   totalBookings: number;
@@ -237,6 +244,17 @@ export interface DashboardStats {
   revenueChange: number;
 }
 
+export interface BookingCounts {
+  total: number;
+  pending: number;
+  confirmed: number;
+  completed: number;
+  cancelled: number;
+  today: number;
+  thisWeek: number;
+  thisMonth: number;
+}
+
 export interface RecentBooking {
   customerName: string;
   stationLocation: string;
@@ -246,6 +264,45 @@ export interface RecentBooking {
 export interface StationUtilization {
   stationName: string;
   utilizationPercentage: number;
+}
+
+// Charging Station Search Types
+export interface ChargingStationSearchParams {
+  location?: string;
+  type?: ChargingType;
+  latitude?: number;
+  longitude?: number;
+  radiusKm?: number;
+  availableOnly?: boolean;
+  maxPricePerHour?: number;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ChargingStationNearbyParams {
+  latitude?: number;
+  longitude?: number;
+  radiusKm?: number;
+  availableOnly?: boolean;
+  limit?: number;
+}
+
+// Booking Query Types
+export interface BookingQueryParams {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  evOwnerNic?: string;
+  fromDate?: string;
+  toDate?: string;
+}
+
+// EV Owner Query Types
+export interface EVOwnerQueryParams {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  searchTerm?: string;
 }
 
 // Legacy Types for backward compatibility
