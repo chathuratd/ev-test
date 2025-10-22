@@ -1,47 +1,39 @@
 import { useState, useEffect } from 'react';
 import { MapPin, Battery, Clock, Car, Phone, Search, Filter } from 'lucide-react';
-import { stationService } from '../services/stationService';
 import { ChargingStation, ChargingType } from '../types';
+import apiClient from '../services/api';
 
 const EVOwnerStationsPage = () => {
   const [stations, setStations] = useState<ChargingStation[]>([]);
-  const [filteredStations, setFilteredStations] = useState<ChargingStation[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<ChargingType | 'all'>('all');
   const [loading, setLoading] = useState(true);
 
+  // THIN CLIENT: Fetch stations from backend with filtering
   useEffect(() => {
     fetchStations();
-  }, []);
-
-  useEffect(() => {
-    let filtered = stations;
-
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (station) =>
-          station.Name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          station.Location.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    if (typeFilter !== 'all') {
-      filtered = filtered.filter((station) => station.ChargingType === typeFilter);
-    }
-
-    setFilteredStations(filtered);
-  }, [searchQuery, typeFilter, stations]);
+  }, [searchQuery, typeFilter]);
 
   const fetchStations = async () => {
     try {
       setLoading(true);
-      const response = await stationService.getAllStations();
-      if (response.Success && response.Data) {
-        setStations(response.Data);
-        setFilteredStations(response.Data);
+      
+      // Build query parameters for backend filtering
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('searchTerm', searchQuery);
+      if (typeFilter !== 'all') params.append('type', typeFilter);
+      params.append('page', '1');
+      params.append('pageSize', '100');
+      
+      const response = await apiClient.get(`/api/v1/ChargingStation/search?${params.toString()}`);
+      if (response.data.Success && response.data.Data) {
+        setStations(response.data.Data);
+      } else {
+        setStations([]);
       }
     } catch (error) {
       console.error('Failed to fetch stations:', error);
+      setStations([]);
     } finally {
       setLoading(false);
     }
@@ -99,7 +91,7 @@ const EVOwnerStationsPage = () => {
 
         {/* Stations Grid */}
         <div className="grid gap-6">
-          {filteredStations.map((station) => (
+          {stations.map((station) => (
             <div key={station.Id} className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 hover:border-zinc-700 transition-colors">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-start gap-4">
@@ -158,7 +150,7 @@ const EVOwnerStationsPage = () => {
           ))}
         </div>
 
-        {filteredStations.length === 0 && (
+        {stations.length === 0 && (
           <div className="text-center py-12">
             <Battery className="mx-auto w-12 h-12 text-gray-400 mb-4" />
             <p className="text-gray-400 text-lg mb-2">No stations found</p>

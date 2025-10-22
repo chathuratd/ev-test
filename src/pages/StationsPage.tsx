@@ -3,38 +3,38 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search } from 'lucide-react';
 import { stationService } from '../services/stationService';
 import { ChargingStation } from '../types';
+import apiClient from '../services/api';
 
 const StationsPage: React.FC = () => {
   const [stations, setStations] = useState<ChargingStation[]>([]);
-  const [filteredStations, setFilteredStations] = useState<ChargingStation[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // THIN CLIENT: Fetch stations from backend with search filtering
   useEffect(() => {
     fetchStations();
-  }, []);
-
-  useEffect(() => {
-    if (searchQuery) {
-      const filtered = stations.filter(
-        (station) =>
-          station.Name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          station.Location.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredStations(filtered);
-    } else {
-      setFilteredStations(stations);
-    }
-  }, [searchQuery, stations]);
+  }, [searchQuery]);
 
   const fetchStations = async () => {
     try {
-      const data = await stationService.getAllStations();
-      setStations(data.Data);
-      setFilteredStations(data.Data);
+      setLoading(true);
+      
+      // Use backend search endpoint with query parameters
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('searchTerm', searchQuery);
+      params.append('page', '1');
+      params.append('pageSize', '100');
+      
+      const response = await apiClient.get(`/api/v1/ChargingStation/search?${params.toString()}`);
+      if (response.data.Success && response.data.Data) {
+        setStations(response.data.Data);
+      } else {
+        setStations([]);
+      }
     } catch (error) {
       console.error('Failed to fetch stations:', error);
+      setStations([]);
     } finally {
       setLoading(false);
     }
@@ -103,7 +103,7 @@ const StationsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredStations.map((station) => (
+              {stations.map((station) => (
                 <tr key={station.Id} className="border-b border-zinc-800 hover:bg-zinc-800/50">
                   <td className="py-4 px-4">
                     <div>
@@ -177,7 +177,7 @@ const StationsPage: React.FC = () => {
             </tbody>
           </table>
 
-          {filteredStations.length === 0 && (
+          {stations.length === 0 && (
             <div className="text-center py-12">
               <p className="text-gray-400">No stations found</p>
             </div>

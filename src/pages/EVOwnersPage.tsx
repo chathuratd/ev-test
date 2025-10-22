@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Search, Filter, User, Car, Clock, Plus, Mail, Phone, Eye, UserPlus } from 'lucide-react';
+import { Search, User, Mail, Phone, Eye, UserPlus } from 'lucide-react';
 import { evOwnerService } from '../services/evOwnerService';
-import { bookingService } from '../services/bookingService';
 import { EVOwner, RegisterEVOwnerRequestDto, Booking, BookingStatus } from '../types';
+import apiClient from '../services/api';
 
 const EVOwnersPage = () => {
   const [evOwners, setEvOwners] = useState<EVOwner[]>([]);
-  const [filteredEvOwners, setFilteredEvOwners] = useState<EVOwner[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -14,106 +13,46 @@ const EVOwnersPage = () => {
   const [selectedOwner, setSelectedOwner] = useState<EVOwner | null>(null);
   const [ownerBookings, setOwnerBookings] = useState<Booking[]>([]);
   const [newOwner, setNewOwner] = useState<RegisterEVOwnerRequestDto>({
-    Nic: '',
+    NIC: '',
     FirstName: '',
     LastName: '',
     Email: '',
     PhoneNumber: '',
     Password: '',
-    ConfirmPassword: '',
-    LicenseNumber: '',
-    VehicleModel: '',
-    VehicleYear: new Date().getFullYear()
+    ConfirmPassword: ''
   });
 
+  // THIN CLIENT: Fetch EV owners from backend with filtering
   useEffect(() => {
     fetchEvOwners();
-  }, []);
-
-  useEffect(() => {
-    let filtered = evOwners;
-
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (owner) =>
-          owner.Nic.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          owner.FirstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          owner.LastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          owner.Email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          owner.LicenseNumber.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    setFilteredEvOwners(filtered);
-  }, [searchQuery, evOwners]);
+  }, [searchQuery]);
 
   const fetchEvOwners = async () => {
     try {
       setLoading(true);
-      // Since there's no "get all EV owners" endpoint, we'll use mock data
-      setMockEvOwners();
+      
+      // Build query parameters for backend filtering
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('searchTerm', searchQuery);
+      params.append('page', '1');
+      params.append('pageSize', '100');
+      
+      const response = await apiClient.get(`/api/v1/EVOwners?${params.toString()}`);
+      
+      if (response.data.Success && response.data.Data) {
+        setEvOwners(response.data.Data);
+      }
     } catch (error) {
       console.error('Failed to fetch EV owners:', error);
-      setMockEvOwners();
+      setEvOwners([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const setMockEvOwners = () => {
-    const mockData: EVOwner[] = [
-      {
-        Nic: '123456789V',
-        FirstName: 'John',
-        LastName: 'Doe',
-        Email: 'john.doe@email.com',
-        PhoneNumber: '+94771234567',
-        LicenseNumber: 'B1234567',
-        VehicleModel: 'Tesla Model 3',
-        VehicleYear: 2023,
-        RegistrationDate: '2025-01-15T08:30:00Z',
-      },
-      {
-        Nic: '987654321V',
-        FirstName: 'Jane',
-        LastName: 'Smith',
-        Email: 'jane.smith@email.com',
-        PhoneNumber: '+94777654321',
-        LicenseNumber: 'B7654321',
-        VehicleModel: 'Nissan Leaf',
-        VehicleYear: 2022,
-        RegistrationDate: '2024-12-20T10:15:00Z',
-      },
-      {
-        Nic: '456789123V',
-        FirstName: 'Bob',
-        LastName: 'Johnson',
-        Email: 'bob.johnson@email.com',
-        PhoneNumber: '+94779876543',
-        LicenseNumber: 'B9876543',
-        VehicleModel: 'BMW i3',
-        VehicleYear: 2024,
-        RegistrationDate: '2024-11-10T14:45:00Z',
-      },
-      {
-        Nic: '789123456V',
-        FirstName: 'Alice',
-        LastName: 'Wilson',
-        Email: 'alice.wilson@email.com',
-        PhoneNumber: '+94773456789',
-        LicenseNumber: 'B3456789',
-        VehicleModel: 'Hyundai Kona Electric',
-        VehicleYear: 2023,
-        RegistrationDate: '2024-10-05T16:20:00Z',
-      },
-    ];
-    setEvOwners(mockData);
-    setFilteredEvOwners(mockData);
-  };
-
   const handleCreateOwner = async () => {
     try {
-      if (!newOwner.Nic || !newOwner.FirstName || !newOwner.LastName || !newOwner.Email || !newOwner.Password) {
+      if (!newOwner.NIC || !newOwner.FirstName || !newOwner.LastName || !newOwner.Email || !newOwner.Password) {
         alert('Please fill in all required fields');
         return;
       }
@@ -124,19 +63,9 @@ const EVOwnersPage = () => {
       }
 
       const response = await evOwnerService.registerEVOwner(newOwner);
-      if (response.Success && response.Data) {
-        const newOwnerData: EVOwner = {
-          Nic: newOwner.Nic,
-          FirstName: newOwner.FirstName,
-          LastName: newOwner.LastName,
-          Email: newOwner.Email,
-          PhoneNumber: newOwner.PhoneNumber,
-          LicenseNumber: newOwner.LicenseNumber,
-          VehicleModel: newOwner.VehicleModel,
-          VehicleYear: newOwner.VehicleYear,
-          RegistrationDate: new Date().toISOString(),
-        };
-        setEvOwners(prev => [...prev, newOwnerData]);
+      if (response.Success) {
+        // Refresh the list after successful registration
+        fetchEvOwners();
         setShowCreateModal(false);
         resetNewOwner();
         alert('EV Owner registered successfully!');
@@ -151,16 +80,13 @@ const EVOwnersPage = () => {
 
   const resetNewOwner = () => {
     setNewOwner({
-      Nic: '',
+      NIC: '',
       FirstName: '',
       LastName: '',
       Email: '',
       PhoneNumber: '',
       Password: '',
-      ConfirmPassword: '',
-      LicenseNumber: '',
-      VehicleModel: '',
-      VehicleYear: new Date().getFullYear()
+      ConfirmPassword: ''
     });
   };
 
@@ -168,28 +94,16 @@ const EVOwnersPage = () => {
     setSelectedOwner(owner);
     setShowDetailsModal(true);
     
-    // Fetch owner's bookings (mock data for now)
-    const mockBookings: Booking[] = [
-      {
-        Id: '1',
-        EvOwnerNic: owner.Nic,
-        ChargingStationId: 'station-1',
-        SlotNumber: 1,
-        ReservationDateTime: '2025-10-09T10:00:00Z',
-        Status: BookingStatus.Confirmed,
-        CreatedAt: '2025-10-08T14:30:00Z',
-      },
-      {
-        Id: '2',
-        EvOwnerNic: owner.Nic,
-        ChargingStationId: 'station-2',
-        SlotNumber: 2,
-        ReservationDateTime: '2025-10-07T14:00:00Z',
-        Status: BookingStatus.Completed,
-        CreatedAt: '2025-10-07T12:15:00Z',
-      },
-    ];
-    setOwnerBookings(mockBookings);
+    // THIN CLIENT: Fetch owner's bookings from backend
+    try {
+      const response = await apiClient.get(`/api/v1/Booking/evowner/${owner.NIC}`);
+      if (response.data.Success && response.data.Data) {
+        setOwnerBookings(response.data.Data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch bookings:', error);
+      setOwnerBookings([]);
+    }
   };
 
   const formatDateTime = (dateTimeString: string) => {
@@ -257,8 +171,8 @@ const EVOwnersPage = () => {
         </div>
 
         <div className="grid gap-4">
-          {filteredEvOwners.map((owner) => (
-            <div key={owner.Nic} className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 hover:border-zinc-600 transition-colors">
+          {evOwners.map((owner) => (
+            <div key={owner.NIC} className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 hover:border-zinc-600 transition-colors">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-green-500/10 border border-green-500/20 rounded-lg flex items-center justify-center">
@@ -266,7 +180,7 @@ const EVOwnersPage = () => {
                   </div>
                   <div>
                     <h3 className="text-white font-semibold text-lg">{owner.FirstName} {owner.LastName}</h3>
-                    <p className="text-gray-400 text-sm">NIC: {owner.Nic}</p>
+                    <p className="text-gray-400 text-sm">NIC: {owner.NIC}</p>
                   </div>
                 </div>
                 <button
@@ -278,7 +192,7 @@ const EVOwnersPage = () => {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-center gap-3">
                   <Mail className="w-5 h-5 text-gray-400" />
                   <div>
@@ -293,26 +207,12 @@ const EVOwnersPage = () => {
                     <p className="text-white font-medium">{owner.PhoneNumber}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Car className="w-5 h-5 text-gray-400" />
-                  <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-wide">Vehicle</p>
-                    <p className="text-white font-medium">{owner.VehicleModel} ({owner.VehicleYear})</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Clock className="w-5 h-5 text-gray-400" />
-                  <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-wide">Registered</p>
-                    <p className="text-white font-medium">{formatDateTime(owner.RegistrationDate)}</p>
-                  </div>
-                </div>
               </div>
             </div>
           ))}
         </div>
 
-        {filteredEvOwners.length === 0 && (
+        {evOwners.length === 0 && (
           <div className="text-center py-12">
             <User className="mx-auto w-12 h-12 text-gray-400 mb-4" />
             <p className="text-gray-400 text-lg mb-2">No EV owners found</p>
@@ -332,8 +232,8 @@ const EVOwnersPage = () => {
                 <label className="block text-gray-300 text-sm font-medium mb-2">NIC *</label>
                 <input
                   type="text"
-                  value={newOwner.Nic}
-                  onChange={(e) => setNewOwner({...newOwner, Nic: e.target.value})}
+                  value={newOwner.NIC}
+                  onChange={(e) => setNewOwner({...newOwner, NIC: e.target.value})}
                   placeholder="Enter NIC number"
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
                 />
@@ -380,40 +280,6 @@ const EVOwnersPage = () => {
                   onChange={(e) => setNewOwner({...newOwner, PhoneNumber: e.target.value})}
                   placeholder="Enter phone number"
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">License Number</label>
-                <input
-                  type="text"
-                  value={newOwner.LicenseNumber}
-                  onChange={(e) => setNewOwner({...newOwner, LicenseNumber: e.target.value})}
-                  placeholder="Enter driving license number"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">Vehicle Model</label>
-                <input
-                  type="text"
-                  value={newOwner.VehicleModel}
-                  onChange={(e) => setNewOwner({...newOwner, VehicleModel: e.target.value})}
-                  placeholder="Enter vehicle model"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">Vehicle Year</label>
-                <input
-                  type="number"
-                  min="1990"
-                  max={new Date().getFullYear() + 1}
-                  value={newOwner.VehicleYear}
-                  onChange={(e) => setNewOwner({...newOwner, VehicleYear: parseInt(e.target.value) || new Date().getFullYear()})}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-green-500"
                 />
               </div>
               
@@ -475,18 +341,18 @@ const EVOwnersPage = () => {
               </button>
             </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6">
               {/* Owner Information */}
               <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
                 <h4 className="text-lg font-semibold text-white mb-4">Personal Information</h4>
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-gray-400 text-sm">Full Name</p>
                     <p className="text-white font-medium">{selectedOwner.FirstName} {selectedOwner.LastName}</p>
                   </div>
                   <div>
                     <p className="text-gray-400 text-sm">NIC</p>
-                    <p className="text-white font-medium">{selectedOwner.Nic}</p>
+                    <p className="text-white font-medium">{selectedOwner.NIC}</p>
                   </div>
                   <div>
                     <p className="text-gray-400 text-sm">Email</p>
@@ -495,29 +361,6 @@ const EVOwnersPage = () => {
                   <div>
                     <p className="text-gray-400 text-sm">Phone</p>
                     <p className="text-white font-medium">{selectedOwner.PhoneNumber}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 text-sm">License Number</p>
-                    <p className="text-white font-medium">{selectedOwner.LicenseNumber}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 text-sm">Registration Date</p>
-                    <p className="text-white font-medium">{formatDateTime(selectedOwner.RegistrationDate)}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Vehicle Information */}
-              <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
-                <h4 className="text-lg font-semibold text-white mb-4">Vehicle Information</h4>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-gray-400 text-sm">Vehicle Model</p>
-                    <p className="text-white font-medium">{selectedOwner.VehicleModel}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 text-sm">Year</p>
-                    <p className="text-white font-medium">{selectedOwner.VehicleYear}</p>
                   </div>
                 </div>
               </div>

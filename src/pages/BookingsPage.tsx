@@ -3,11 +3,11 @@ import { Search, Filter, Calendar, Clock, MapPin, User, Plus, AlertCircle, Check
 import { bookingService } from '../services/bookingService';
 import { stationService } from '../services/stationService';
 import { Booking, BookingStatus, ChargingStation, CreateBookingRequestDto } from '../types';
+import apiClient from '../services/api';
 
 const BookingsPage = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [stations, setStations] = useState<ChargingStation[]>([]);
-  const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all'>('all');
   const [loading, setLoading] = useState(true);
@@ -20,89 +20,46 @@ const BookingsPage = () => {
   });
 
   useEffect(() => {
-    fetchData();
+    fetchStations();
   }, []);
 
+  // THIN CLIENT: Fetch bookings from backend with filters
   useEffect(() => {
-    let filtered = bookings;
+    fetchBookings();
+  }, [searchQuery, statusFilter]);
 
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (booking) =>
-          booking.EvOwnerNic.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          booking.Id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          booking.ChargingStationId.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((booking) => booking.Status === statusFilter);
-    }
-
-    setFilteredBookings(filtered);
-  }, [searchQuery, statusFilter, bookings]);
-
-  const fetchData = async () => {
+  const fetchBookings = async () => {
     try {
       setLoading(true);
       
-      // Fetch stations
-      const stationsResponse = await stationService.getAllStations();
-      if (stationsResponse.Success && stationsResponse.Data) {
-        setStations(stationsResponse.Data);
+      // Build query parameters for backend filtering
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('searchTerm', searchQuery);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      params.append('page', '1');
+      params.append('pageSize', '100');
+      
+      const response = await apiClient.get(`/api/v1/Booking?${params.toString()}`);
+      
+      if (response.data.Success && response.data.Data) {
+        setBookings(response.data.Data);
       }
-
-      // Since there's no "get all bookings" endpoint, we'll use mock data
-      setMockBookings();
     } catch (error) {
-      console.error('Failed to fetch data:', error);
-      setMockBookings();
+      console.error('Failed to fetch bookings:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const setMockBookings = () => {
-    const mockData: Booking[] = [
-      {
-        Id: '1',
-        EvOwnerNic: '123456789V',
-        ChargingStationId: 'station-1',
-        SlotNumber: 1,
-        ReservationDateTime: '2025-10-09T10:00:00Z',
-        Status: BookingStatus.Pending,
-        CreatedAt: '2025-10-08T14:30:00Z',
-      },
-      {
-        Id: '2',
-        EvOwnerNic: '987654321V',
-        ChargingStationId: 'station-2',
-        SlotNumber: 2,
-        ReservationDateTime: '2025-10-09T14:00:00Z',
-        Status: BookingStatus.Confirmed,
-        CreatedAt: '2025-10-08T12:15:00Z',
-      },
-      {
-        Id: '3',
-        EvOwnerNic: '456789123V',
-        ChargingStationId: 'station-1',
-        SlotNumber: 3,
-        ReservationDateTime: '2025-10-08T16:00:00Z',
-        Status: BookingStatus.Completed,
-        CreatedAt: '2025-10-08T10:00:00Z',
-      },
-      {
-        Id: '4',
-        EvOwnerNic: '789123456V',
-        ChargingStationId: 'station-3',
-        SlotNumber: 1,
-        ReservationDateTime: '2025-10-07T18:00:00Z',
-        Status: BookingStatus.Cancelled,
-        CreatedAt: '2025-10-07T15:00:00Z',
-      },
-    ];
-    setBookings(mockData);
-    setFilteredBookings(mockData);
+  const fetchStations = async () => {
+    try {
+      const stationsResponse = await stationService.getAllStations();
+      if (stationsResponse.Success && stationsResponse.Data) {
+        setStations(stationsResponse.Data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch stations:', error);
+    }
   };
 
   const handleStatusChange = async (bookingId: string, newStatus: BookingStatus) => {
@@ -259,7 +216,7 @@ const BookingsPage = () => {
         </div>
 
         <div className="grid gap-4">
-          {filteredBookings.map((booking) => (
+          {bookings.map((booking) => (
             <div key={booking.Id} className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 hover:border-zinc-600 transition-colors">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-4">
@@ -334,7 +291,7 @@ const BookingsPage = () => {
           ))}
         </div>
 
-        {filteredBookings.length === 0 && (
+        {bookings.length === 0 && (
           <div className="text-center py-12">
             <AlertCircle className="mx-auto w-12 h-12 text-gray-400 mb-4" />
             <p className="text-gray-400 text-lg mb-2">No bookings found</p>

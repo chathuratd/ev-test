@@ -5,32 +5,14 @@ import apiClient from '../services/api';
 
 const EVOwnerBookingsPage = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all'>('all');
   const [loading, setLoading] = useState(true);
 
+  // THIN CLIENT: Fetch user bookings from backend with filtering
   useEffect(() => {
     fetchUserBookings();
-  }, []);
-
-  useEffect(() => {
-    let filtered = bookings;
-
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (booking) =>
-          booking.Id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          booking.ChargingStationId.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((booking) => booking.Status === statusFilter);
-    }
-
-    setFilteredBookings(filtered);
-  }, [searchQuery, statusFilter, bookings]);
+  }, [searchQuery, statusFilter]);
 
   const fetchUserBookings = async () => {
     try {
@@ -45,15 +27,17 @@ const EVOwnerBookingsPage = () => {
         return;
       }
       
-      // Fetch user bookings from API
-      const response = await apiClient.get(`/api/v1/Booking/evowner/${currentUserNIC}`);
+      // Build query parameters for backend filtering
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('searchTerm', searchQuery);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      
+      // Fetch user bookings from API with backend filtering
+      const response = await apiClient.get(`/api/v1/Booking/evowner/${currentUserNIC}?${params.toString()}`);
       if (response.data.Success && response.data.Data) {
-        const userBookings: Booking[] = response.data.Data;
-        setBookings(userBookings);
-        setFilteredBookings(userBookings);
+        setBookings(response.data.Data);
       } else {
         setBookings([]);
-        setFilteredBookings([]);
       }
     } catch (error: any) {
       console.error('Failed to fetch bookings:', error);
@@ -62,7 +46,6 @@ const EVOwnerBookingsPage = () => {
         window.location.href = '/ev-owner-login';
       }
       setBookings([]);
-      setFilteredBookings([]);
     } finally {
       setLoading(false);
     }
@@ -199,7 +182,7 @@ const EVOwnerBookingsPage = () => {
 
         {/* Bookings List */}
         <div className="space-y-4">
-          {filteredBookings.map((booking) => (
+          {bookings.map((booking) => (
             <div key={booking.Id} className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 hover:border-zinc-700 transition-colors">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-4">
@@ -261,7 +244,7 @@ const EVOwnerBookingsPage = () => {
           ))}
         </div>
 
-        {filteredBookings.length === 0 && (
+        {bookings.length === 0 && (
           <div className="text-center py-12">
             <Battery className="mx-auto w-12 h-12 text-gray-400 mb-4" />
             <p className="text-gray-400 text-lg mb-2">No bookings found</p>
