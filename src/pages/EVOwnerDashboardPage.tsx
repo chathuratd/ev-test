@@ -23,6 +23,7 @@ const EVOwnerDashboardPage: React.FC = () => {
   const [recentBookings, setRecentBookings] = useState<Booking[]>([]);
   const [nearbyStations, setNearbyStations] = useState<ChargingStation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
     fetchDashboardData();
@@ -31,6 +32,7 @@ const EVOwnerDashboardPage: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError('');
       
       // Get current user NIC from localStorage (set during login)
       const currentUserNIC = localStorage.getItem('userNic') || localStorage.getItem('evOwnerNic');
@@ -41,30 +43,23 @@ const EVOwnerDashboardPage: React.FC = () => {
         return;
       }
       
-      // Fetch user bookings from API
-      const bookingsResponse = await apiClient.get(`/api/v1/Booking/evowner/${currentUserNIC}`);
-      if (bookingsResponse.data.Success && bookingsResponse.data.Data) {
-        const userBookings: Booking[] = bookingsResponse.data.Data;
+      // THIN CLIENT: Use backend endpoint for dashboard stats
+      // Backend calculates: pending, approved, completed counts, recent bookings, etc.
+      const statsResponse = await apiClient.get(`/api/v1/EVOwners/${currentUserNIC}/dashboard-stats`);
+      
+      if (statsResponse.data.Success && statsResponse.data.Data) {
+        const dashboardData = statsResponse.data.Data;
         
-        // Get recent bookings (last 5)
-        const sortedBookings = userBookings.sort((a, b) => 
-          new Date(b.CreatedAt || '').getTime() - new Date(a.CreatedAt || '').getTime()
-        );
-        setRecentBookings(sortedBookings.slice(0, 5));
+        // Use backend-calculated statistics directly
+        setStats({
+          pendingReservations: dashboardData.PendingReservations || 0,
+          approvedReservations: dashboardData.ApprovedReservations || 0,
+          totalBookings: dashboardData.TotalBookings || 0,
+          nearbyStations: 0 // Will be updated from stations API
+        });
         
-        // Calculate stats from real booking data
-        const pendingCount = userBookings.filter(b => b.Status === BookingStatus.Pending).length;
-        const confirmedCount = userBookings.filter(b => 
-          b.Status === BookingStatus.Confirmed && 
-          new Date(b.ReservationDateTime) > new Date()
-        ).length;
-        
-        setStats(prev => ({
-          ...prev,
-          pendingReservations: pendingCount,
-          approvedReservations: confirmedCount,
-          totalBookings: userBookings.length,
-        }));
+        // Use backend-provided recent bookings (already sorted and limited)
+        setRecentBookings(dashboardData.RecentBookings || []);
       }
       
       // Fetch all stations from API
@@ -83,9 +78,11 @@ const EVOwnerDashboardPage: React.FC = () => {
       
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
-      // If unauthorized, redirect to login
+      
       if (error.response?.status === 401) {
         navigate('/ev-owner-login');
+      } else {
+        setError('Failed to load dashboard data. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -148,6 +145,29 @@ const EVOwnerDashboardPage: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-black p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-red-400" />
+              <div>
+                <p className="text-red-400 font-medium">{error}</p>
+                <button
+                  onClick={fetchDashboardData}
+                  className="text-red-300 text-sm underline hover:text-red-200 mt-1"
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

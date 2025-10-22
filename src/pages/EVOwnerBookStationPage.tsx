@@ -7,11 +7,13 @@ import apiClient from '../services/api';
 const EVOwnerBookStationPage = () => {
   const [stations, setStations] = useState<ChargingStation[]>([]);
   const [selectedStation, setSelectedStation] = useState<ChargingStation | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<number[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [duration, setDuration] = useState(2);
   const [loading, setLoading] = useState(true);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -19,6 +21,13 @@ const EVOwnerBookStationPage = () => {
   useEffect(() => {
     fetchStations();
   }, []);
+
+  // THIN CLIENT: Fetch available slots from backend when station or date changes
+  useEffect(() => {
+    if (selectedStation && selectedDate) {
+      fetchAvailableSlots();
+    }
+  }, [selectedStation, selectedDate]);
 
   const fetchStations = async () => {
     try {
@@ -33,18 +42,32 @@ const EVOwnerBookStationPage = () => {
     }
   };
 
-  const getAvailableSlots = (station: ChargingStation) => {
-    // NOTE: Real slot availability should come from API endpoint
-    // Currently, no API endpoint exists for checking real-time slot availability
-    // Using station's AvailableSlots count as approximation
-    const totalSlots = station.TotalSlots;
-    const availableCount = station.AvailableSlots;
+  // THIN CLIENT: Get available slots from backend API
+  // Backend calculates which slots are available based on existing bookings
+  const fetchAvailableSlots = async () => {
+    if (!selectedStation || !selectedDate) return;
+
+    setLoadingSlots(true);
+    setError('');
     
-    const availableSlots = [];
-    for (let i = 1; i <= Math.min(availableCount, totalSlots); i++) {
-      availableSlots.push(i);
+    try {
+      const response = await apiClient.get(
+        `/api/v1/ChargingStation/${selectedStation.Id}/available-slots?date=${selectedDate}`
+      );
+      
+      if (response.data.Success && response.data.Data) {
+        setAvailableSlots(response.data.Data.AvailableSlots || []);
+      } else {
+        setError('Failed to load available slots');
+        setAvailableSlots([]);
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch available slots:', error);
+      setError('Failed to load available slots. Please try again or select a different date.');
+      setAvailableSlots([]);
+    } finally {
+      setLoadingSlots(false);
     }
-    return availableSlots;
   };
 
   const getChargingTypeIcon = (type: string) => {
@@ -215,7 +238,8 @@ const EVOwnerBookStationPage = () => {
           // Station Selection
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {stations.map((station) => {
-              const availableSlots = getAvailableSlots(station);
+              // Display available count from station data
+              const availableCount = station.AvailableSlots || 0;
               return (
                 <div
                   key={station.Id}
@@ -239,7 +263,7 @@ const EVOwnerBookStationPage = () => {
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4 text-gray-400" />
                       <span className="text-gray-300 text-sm">
-                        {availableSlots.length} of {station.TotalSlots} slots available
+                        {availableCount} of {station.TotalSlots} slots available
                       </span>
                     </div>
 
@@ -252,7 +276,7 @@ const EVOwnerBookStationPage = () => {
                   <div className="mt-4 pt-4 border-t border-zinc-800">
                     <div className="flex items-center justify-between">
                       <span className="text-green-400 font-medium">
-                        {availableSlots.length > 0 ? 'Available Now' : 'Fully Booked'}
+                        {availableCount > 0 ? 'Available Now' : 'Fully Booked'}
                       </span>
                       <span className="text-gray-400 text-sm">Click to book</span>
                     </div>
@@ -290,22 +314,37 @@ const EVOwnerBookStationPage = () => {
 
                 {/* Slot Selection */}
                 <div>
-                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-2">Available Slots</p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {getAvailableSlots(selectedStation).map((slotNumber) => (
-                      <button
-                        key={slotNumber}
-                        onClick={() => handleSlotSelect(slotNumber)}
-                        className={`p-3 rounded-lg border text-center transition-colors ${
-                          selectedSlot === slotNumber
-                            ? 'bg-green-500/20 border-green-500 text-green-400'
-                            : 'bg-zinc-800 border-zinc-700 text-gray-300 hover:border-zinc-600'
-                        }`}
-                      >
-                        Slot {slotNumber}
-                      </button>
-                    ))}
-                  </div>
+                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-2">
+                    Available Slots {selectedDate ? `for ${selectedDate}` : '(Select date first)'}
+                  </p>
+                  {loadingSlots ? (
+                    <div className="text-center py-4">
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500 mx-auto"></div>
+                      <p className="text-gray-400 text-sm mt-2">Loading available slots...</p>
+                    </div>
+                  ) : availableSlots.length > 0 ? (
+                    <div className="grid grid-cols-4 gap-2">
+                      {availableSlots.map((slotNumber) => (
+                        <button
+                          key={slotNumber}
+                          onClick={() => handleSlotSelect(slotNumber)}
+                          className={`p-3 rounded-lg border text-center transition-colors ${
+                            selectedSlot === slotNumber
+                              ? 'bg-green-500/20 border-green-500 text-green-400'
+                              : 'bg-zinc-800 border-zinc-700 text-gray-300 hover:border-zinc-600'
+                          }`}
+                        >
+                          Slot {slotNumber}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 bg-zinc-800 rounded-lg">
+                      <p className="text-gray-400 text-sm">
+                        {selectedDate ? 'No slots available for this date' : 'Please select a date to view available slots'}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

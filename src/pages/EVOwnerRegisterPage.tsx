@@ -20,71 +20,9 @@ const EVOwnerRegisterPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
 
-  // Validation function that matches backend validation exactly
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    // NIC validation - match backend regex exactly
-    if (!formData.NIC) {
-      newErrors.NIC = 'NIC is required';
-    } else if (!/^[0-9]{9}[vVxX]$|^[0-9]{12}$/.test(formData.NIC)) {
-      newErrors.NIC = 'NIC must be in valid Sri Lankan format (9 digits followed by V/X or 12 digits)';
-    }
-
-    // FirstName validation
-    if (!formData.FirstName) {
-      newErrors.FirstName = 'First name is required';
-    } else if (formData.FirstName.length > 50) {
-      newErrors.FirstName = 'First name cannot exceed 50 characters';
-    }
-
-    // LastName validation
-    if (!formData.LastName) {
-      newErrors.LastName = 'Last name is required';
-    } else if (formData.LastName.length > 50) {
-      newErrors.LastName = 'Last name cannot exceed 50 characters';
-    }
-
-    // Email validation
-    if (!formData.Email) {
-      newErrors.Email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.Email)) {
-      newErrors.Email = 'Email must be valid';
-    }
-
-    // Phone number validation - exactly 10 digits
-    if (!formData.PhoneNumber) {
-      newErrors.PhoneNumber = 'Phone number is required';
-    } else if (!/^[0-9]{10}$/.test(formData.PhoneNumber)) {
-      newErrors.PhoneNumber = 'Phone number must be 10 digits';
-    }
-
-    // Password validation
-    if (!formData.Password) {
-      newErrors.Password = 'Password is required';
-    } else {
-      if (formData.Password.length < 8) {
-        newErrors.Password = 'Password must be at least 8 characters';
-      } else if (!/[A-Z]/.test(formData.Password)) {
-        newErrors.Password = 'Password must contain at least one uppercase letter';
-      } else if (!/[a-z]/.test(formData.Password)) {
-        newErrors.Password = 'Password must contain at least one lowercase letter';
-      } else if (!/[0-9]/.test(formData.Password)) {
-        newErrors.Password = 'Password must contain at least one number';
-      }
-    }
-
-    // Confirm password validation
-    if (!formData.ConfirmPassword) {
-      newErrors.ConfirmPassword = 'Confirm password is required';
-    } else if (formData.Password !== formData.ConfirmPassword) {
-      newErrors.ConfirmPassword = 'Passwords do not match';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
+  // THIN CLIENT: All validation is handled by the backend
+  // No client-side validation - we only clear errors when user types
+  
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -100,78 +38,63 @@ const EVOwnerRegisterPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Clear all errors and validate form
-    setErrors({});
-    
-    if (!validateForm()) {
-      return;
-    }
-
     setLoading(true);
+    setErrors({});
 
     try {
+      // THIN CLIENT: Send data directly to backend, let backend validate
       const response = await evOwnerService.registerEVOwner(formData);
+      
       if (response.Success) {
         alert('Registration successful! You can now login.');
         navigate('/ev-owner-login');
       } else {
-        setErrors({ general: response.Message || 'Registration failed' });
+        // Handle backend validation errors
+        if (response.Errors) {
+          setErrors(response.Errors);
+        } else {
+          setErrors({ general: response.Message || 'Registration failed' });
+        }
       }
     } catch (err: any) {
       console.error('Registration error:', err);
       
-      // Handle different types of backend errors
+      // Handle backend errors
       if (err.response?.data) {
         const errorData = err.response.data;
         
-        // Handle validation errors with field-specific messages
-        if (err.response.status === 400 && errorData.errors) {
+        // Backend returns structured validation errors
+        if (errorData.Errors) {
+          setErrors(errorData.Errors);
+        }
+        // Handle .NET validation errors format
+        else if (errorData.errors) {
           const backendErrors = errorData.errors;
           const newErrors: Record<string, string> = {};
           
-          // Map backend errors to frontend format
           Object.keys(backendErrors).forEach(key => {
             const errorMessages = backendErrors[key];
             if (Array.isArray(errorMessages) && errorMessages.length > 0) {
               newErrors[key] = errorMessages[0];
+            } else if (typeof errorMessages === 'string') {
+              newErrors[key] = errorMessages;
             }
           });
           
-          if (Object.keys(newErrors).length > 0) {
-            setErrors(newErrors);
+          setErrors(newErrors);
+        }
+        // Single message errors
+        else if (errorData.Message || errorData.message) {
+          const message = errorData.Message || errorData.message;
+          // Try to map message to specific field if possible
+          if (message.toLowerCase().includes('nic')) {
+            setErrors({ NIC: message });
+          } else if (message.toLowerCase().includes('email')) {
+            setErrors({ Email: message });
           } else {
-            setErrors({ general: errorData.message || 'Registration failed. Please check your details.' });
+            setErrors({ general: message });
           }
         }
-        // Handle business logic errors (like NIC already exists)
-        else if (errorData.message) {
-          // Check if it's a NIC-specific error and display it under the NIC field
-          if (errorData.message.toLowerCase().includes('nic') && errorData.message.toLowerCase().includes('already exists')) {
-            setErrors({ NIC: errorData.message });
-          } else {
-            setErrors({ general: errorData.message });
-          }
-        }
-        // Handle other error message formats
-        else if (errorData.Message) {
-          // Check if it's a NIC-specific error
-          if (errorData.Message.toLowerCase().includes('nic') && errorData.Message.toLowerCase().includes('already exists')) {
-            setErrors({ NIC: errorData.Message });
-          } else {
-            setErrors({ general: errorData.Message });
-          }
-        }
-        // Handle success:false responses
-        else if (errorData.success === false && errorData.message) {
-          // Check if it's a NIC-specific error
-          if (errorData.message.toLowerCase().includes('nic') && errorData.message.toLowerCase().includes('already exists')) {
-            setErrors({ NIC: errorData.message });
-          } else {
-            setErrors({ general: errorData.message });
-          }
-        }
-        // Fallback for any other error structure
         else {
           setErrors({ general: 'Registration failed. Please try again.' });
         }

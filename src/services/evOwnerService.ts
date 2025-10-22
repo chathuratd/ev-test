@@ -109,38 +109,17 @@ export const evOwnerService = {
   },
 
   // Dashboard Statistics
-  // Dashboard Statistics - calculated from real user data
-  async getDashboardStats(nic: string): Promise<any> {
+  // THIN CLIENT: Get dashboard stats calculated by backend
+  async getDashboardStats(nic: string): Promise<ApiResponse<any>> {
     try {
-      // Get user's actual bookings
-      const userBookings = await this.getUserBookings(nic);
-      
-      // Calculate stats from real data
-      const now = new Date();
-      const pendingReservations = userBookings.filter(b => b.Status === 'Pending').length;
-      const approvedReservations = userBookings.filter(b => 
-        b.Status === 'Confirmed' && new Date(b.ReservationDateTime) > now
-      ).length;
-      
-      // Get recent bookings (last 5)
-      const sortedBookings = userBookings.sort((a, b) => 
-        new Date(b.CreatedAt || '').getTime() - new Date(a.CreatedAt || '').getTime()
+      // Backend calculates all statistics
+      const response = await apiClient.get<ApiResponse<any>>(
+        `/api/v1/EVOwners/${nic}/dashboard-stats`
       );
-      const recentBookings = sortedBookings.slice(0, 5).map(booking => ({
-        id: booking.Id,
-        stationId: booking.ChargingStationId,
-        date: booking.ReservationDateTime.split('T')[0],
-        status: booking.Status
-      }));
-      
-      return {
-        pendingReservations,
-        approvedReservations,
-        totalBookings: userBookings.length,
-        recentBookings
-      };
+      return response.data;
     } catch (error: any) {
-      throw new Error('Failed to fetch dashboard stats');
+      console.error('Failed to fetch dashboard stats:', error);
+      throw new Error(error.response?.data?.Message || 'Failed to fetch dashboard stats');
     }
   }
 };
