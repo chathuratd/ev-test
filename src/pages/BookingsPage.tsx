@@ -1,77 +1,62 @@
 import { useEffect, useState } from 'react';
-import { Search, Filter, Calendar, Clock, MapPin, User, Plus, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Search, Filter, Calendar, Clock, MapPin, User, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { bookingService } from '../services/bookingService';
 import { stationService } from '../services/stationService';
-import { Booking, BookingStatus, ChargingStation, CreateBookingRequestDto } from '../types';
+import { Booking, BookingStatus, ChargingStation } from '../types';
+import apiClient from '../services/api';
 
 const BookingsPage = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [stations, setStations] = useState<ChargingStation[]>([]);
-  const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  // Local input state so we only submit when the user presses Enter
+  const [searchInput, setSearchInput] = useState('');
   const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all'>('all');
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newBooking, setNewBooking] = useState<CreateBookingRequestDto>({
-    EvOwnerNic: '',
-    ChargingStationId: '',
-    SlotNumber: 1,
-    ReservationDateTime: ''
-  });
 
   useEffect(() => {
-    fetchData();
+    fetchStations();
   }, []);
 
+  // THIN CLIENT: Fetch bookings from backend with filters
+  // Only fetch when the committed `searchQuery` changes (set on Enter) or statusFilter changes
   useEffect(() => {
-    let filtered = bookings;
+    fetchBookings();
+  }, [searchQuery, statusFilter]);
 
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (booking) =>
-          booking.EvOwnerNic.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          booking.Id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          booking.ChargingStationId.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((booking) => booking.Status === statusFilter);
-    }
-
-    setFilteredBookings(filtered);
-  }, [searchQuery, statusFilter, bookings]);
-
-  const fetchData = async () => {
+  const fetchBookings = async () => {
     try {
       setLoading(true);
       
-      // Fetch stations
-      const stationsResponse = await stationService.getAllStations();
-      if (stationsResponse.Success && stationsResponse.Data) {
-        setStations(stationsResponse.Data);
-      }
-
-      // Fetch all bookings using the new method
-      const bookingsResponse = await bookingService.getAllBookings();
-      if (bookingsResponse.Success && bookingsResponse.Data) {
-        setBookings(bookingsResponse.Data);
-        setFilteredBookings(bookingsResponse.Data);
-      } else {
-        console.warn('Bookings API returned no data:', bookingsResponse.Message);
-        setBookings([]);
-        setFilteredBookings([]);
+    // Build query parameters for backend filtering
+      const params = new URLSearchParams();
+    if (searchQuery) params.append('searchTerm', searchQuery);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      params.append('page', '1');
+      params.append('pageSize', '100');
+      
+      const response = await apiClient.get(`/Booking?${params.toString()}`);
+      
+      if (response.data.Success && response.data.Data) {
+        setBookings(response.data.Data);
       }
     } catch (error) {
-      console.error('Failed to fetch data:', error);
-      setBookings([]);
-      setFilteredBookings([]);
+      console.error('Failed to fetch bookings:', error);
     } finally {
       setLoading(false);
     }
   };
 
-
+  const fetchStations = async () => {
+    try {
+      const stationsResponse = await stationService.getAllStations();
+      if (stationsResponse.Success && stationsResponse.Data) {
+        setStations(stationsResponse.Data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch stations:', error);
+    }
+  };
 
   const handleStatusChange = async (bookingId: string, newStatus: BookingStatus) => {
     try {
@@ -101,32 +86,6 @@ const BookingsPage = () => {
     }
   };
 
-  const handleCreateBooking = async () => {
-    try {
-      if (!newBooking.EvOwnerNic || !newBooking.ChargingStationId || !newBooking.ReservationDateTime) {
-        alert('Please fill in all required fields');
-        return;
-      }
-
-      const response = await bookingService.createBooking(newBooking);
-      if (response.Success && response.Data) {
-        setBookings(prev => [...prev, response.Data]);
-        setShowCreateModal(false);
-        setNewBooking({
-          EvOwnerNic: '',
-          ChargingStationId: '',
-          SlotNumber: 1,
-          ReservationDateTime: ''
-        });
-        alert('Booking created successfully!');
-      } else {
-        alert(response.Message || 'Failed to create booking');
-      }
-    } catch (error) {
-      console.error('Failed to create booking:', error);
-      alert('Failed to create booking');
-    }
-  };
 
   const getStatusColor = (status: BookingStatus) => {
     switch (status) {
@@ -197,8 +156,13 @@ const BookingsPage = () => {
               <input
                 type="text"
                 placeholder="Search by EV Owner NIC, Booking ID, or Station..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setSearchQuery(searchInput);
+                  }
+                }}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
               />
             </div>
@@ -217,17 +181,10 @@ const BookingsPage = () => {
               </select>
             </div>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-black font-semibold px-4 py-2 rounded-lg transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            New Booking
-          </button>
         </div>
 
         <div className="grid gap-4">
-          {filteredBookings.map((booking) => (
+          {bookings.map((booking) => (
             <div key={booking.Id} className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 hover:border-zinc-600 transition-colors">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-4">
@@ -302,7 +259,7 @@ const BookingsPage = () => {
           ))}
         </div>
 
-        {filteredBookings.length === 0 && (
+        {bookings.length === 0 && (
           <div className="text-center py-12">
             <AlertCircle className="mx-auto w-12 h-12 text-gray-400 mb-4" />
             <p className="text-gray-400 text-lg mb-2">No bookings found</p>
@@ -310,78 +267,6 @@ const BookingsPage = () => {
           </div>
         )}
       </div>
-
-      {/* Create Booking Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-xl font-semibold text-white mb-4">Create New Booking</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">EV Owner NIC</label>
-                <input
-                  type="text"
-                  value={newBooking.EvOwnerNic}
-                  onChange={(e) => setNewBooking({...newBooking, EvOwnerNic: e.target.value})}
-                  placeholder="Enter EV Owner NIC"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">Charging Station</label>
-                <select
-                  value={newBooking.ChargingStationId}
-                  onChange={(e) => setNewBooking({...newBooking, ChargingStationId: e.target.value})}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-green-500"
-                >
-                  <option value="">Select a station</option>
-                  {stations.map(station => (
-                    <option key={station.Id} value={station.Id}>{station.Name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">Slot Number</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={newBooking.SlotNumber}
-                  onChange={(e) => setNewBooking({...newBooking, SlotNumber: parseInt(e.target.value) || 1})}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-green-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">Reservation Date & Time</label>
-                <input
-                  type="datetime-local"
-                  value={newBooking.ReservationDateTime.slice(0, 16)}
-                  onChange={(e) => setNewBooking({...newBooking, ReservationDateTime: e.target.value + ':00Z'})}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-green-500"
-                />
-              </div>
-            </div>
-            
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={handleCreateBooking}
-                className="flex-1 bg-green-500 hover:bg-green-600 text-black font-semibold py-2 rounded-lg transition-colors"
-              >
-                Create Booking
-              </button>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white font-semibold py-2 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

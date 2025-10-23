@@ -105,19 +105,6 @@ const LoginPage = () => {
               {loading ? 'Signing In...' : 'Sign In'}
             </button>
           </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-gray-400 text-sm">
-              EV Owner?{' '}
-              <Link to="/ev-owner-login" className="text-green-400 hover:text-green-300 font-medium">
-                Sign in here
-              </Link>
-              {' or '}
-              <Link to="/ev-owner-register" className="text-green-400 hover:text-green-300 font-medium">
-                Register
-              </Link>
-            </p>
-          </div>
         </div>
       </div>
     </div>
