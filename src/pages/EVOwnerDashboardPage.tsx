@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Calendar, Clock, MapPin, Battery, ChevronRight, Plus, AlertCircle, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { stationService } from '../services/stationService';
+import { bookingService } from '../services/bookingService';
 import { Booking, ChargingStation, BookingStatus } from '../types';
-import apiClient from '../services/api';
 
 interface DashboardStats {
   pendingReservations: number;
@@ -32,39 +32,37 @@ const EVOwnerDashboardPage: React.FC = () => {
     try {
       setLoading(true);
       
-      // Get current user NIC from localStorage (set during login)
-      const currentUserNIC = localStorage.getItem('userNic') || localStorage.getItem('evOwnerNic');
-      
-      if (!currentUserNIC) {
-        console.error('No user NIC found in localStorage');
-        navigate('/ev-owner-login');
-        return;
+      // Fetch booking counts from dedicated API endpoint
+      try {
+        const countsResponse = await bookingService.getBookingCounts();
+        if (countsResponse.Success && countsResponse.Data) {
+          const counts = countsResponse.Data;
+          setStats(prev => ({
+            ...prev,
+            pendingReservations: counts.pendingCount || 0,
+            approvedReservations: counts.confirmedCount || 0,
+            totalBookings: counts.totalCount || 0,
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching booking counts:', error);
+        // Continue with other data even if counts fail
       }
-      
-      // Fetch user bookings from API
-      const bookingsResponse = await apiClient.get(`/api/v1/Booking/evowner/${currentUserNIC}`);
-      if (bookingsResponse.data.Success && bookingsResponse.data.Data) {
-        const userBookings: Booking[] = bookingsResponse.data.Data;
-        
-        // Get recent bookings (last 5)
-        const sortedBookings = userBookings.sort((a, b) => 
-          new Date(b.CreatedAt || '').getTime() - new Date(a.CreatedAt || '').getTime()
-        );
-        setRecentBookings(sortedBookings.slice(0, 5));
-        
-        // Calculate stats from real booking data
-        const pendingCount = userBookings.filter(b => b.Status === BookingStatus.Pending).length;
-        const confirmedCount = userBookings.filter(b => 
-          b.Status === BookingStatus.Confirmed && 
-          new Date(b.ReservationDateTime) > new Date()
-        ).length;
-        
-        setStats(prev => ({
-          ...prev,
-          pendingReservations: pendingCount,
-          approvedReservations: confirmedCount,
-          totalBookings: userBookings.length,
-        }));
+
+      // Fetch upcoming bookings for recent bookings display
+      try {
+        const upcomingResponse = await bookingService.getUpcomingBookings();
+        if (upcomingResponse.Success && upcomingResponse.Data) {
+          const upcomingBookings = upcomingResponse.Data;
+          // Sort by reservation date and take first 5
+          const sortedBookings = upcomingBookings.sort((a, b) => 
+            new Date(a.ReservationDateTime).getTime() - new Date(b.ReservationDateTime).getTime()
+          );
+          setRecentBookings(sortedBookings.slice(0, 5));
+        }
+      } catch (error) {
+        console.error('Error fetching upcoming bookings:', error);
+        setRecentBookings([]);
       }
       
       // Fetch all stations from API

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { MapPin, Battery, Users, Zap, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
 import { ChargingStation, CreateBookingRequestDto } from '../types';
 import { stationService } from '../services/stationService';
-import apiClient from '../services/api';
+import { bookingService } from '../services/bookingService';
 
 const EVOwnerBookStationPage = () => {
   const [stations, setStations] = useState<ChargingStation[]>([]);
@@ -23,11 +23,32 @@ const EVOwnerBookStationPage = () => {
   const fetchStations = async () => {
     try {
       setLoading(true);
+      setError(''); // Clear any previous errors
+      
       const response = await stationService.getAllStations();
-      setStations(response.Data || []);
-    } catch (error) {
+      
+      if (response.Success && response.Data) {
+        setStations(response.Data);
+      } else {
+        console.error('API response indicates failure:', response);
+        setError(response.Message || 'Failed to load charging stations');
+        setStations([]);
+      }
+    } catch (error: any) {
       console.error('Failed to fetch stations:', error);
-      setError('Failed to load charging stations');
+      
+      // More detailed error information
+      if (error.response) {
+        console.error('Error response:', error.response.status, error.response.data);
+        setError(`API Error: ${error.response.status} - ${error.response.data?.Message || error.message}`);
+      } else if (error.request) {
+        console.error('Network error:', error.request);
+        setError('Network error: Unable to connect to the server. Please check if the backend is running.');
+      } else {
+        console.error('Error:', error.message);
+        setError(`Error: ${error.message}`);
+      }
+      setStations([]);
     } finally {
       setLoading(false);
     }
@@ -48,6 +69,10 @@ const EVOwnerBookStationPage = () => {
   };
 
   const getChargingTypeIcon = (type: string) => {
+    if (!type) {
+      return <Battery className="w-4 h-4 text-gray-400" />;
+    }
+    
     switch (type.toLowerCase()) {
       case 'ac':
         return <Zap className="w-4 h-4 text-blue-400" />;
@@ -113,13 +138,13 @@ const EVOwnerBookStationPage = () => {
         ReservationDateTime: selectedDateTime.toISOString(),
       };
 
-      // Call the real booking API
-      const response = await apiClient.post('/api/v1/Booking', bookingRequest);
+      // Call the booking service to create booking
+      const response = await bookingService.createBooking(bookingRequest);
       
-      if (response.data.Success) {
+      if (response.Success) {
         setBookingSuccess(true);
       } else {
-        throw new Error(response.data.Message || 'Failed to create booking');
+        throw new Error(response.Message || 'Failed to create booking');
       }
     } catch (error) {
       console.error('Failed to create booking:', error);
@@ -213,53 +238,71 @@ const EVOwnerBookStationPage = () => {
 
         {!selectedStation ? (
           // Station Selection
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {stations.map((station) => {
-              const availableSlots = getAvailableSlots(station);
-              return (
-                <div
-                  key={station.Id}
-                  className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 hover:border-zinc-700 transition-colors cursor-pointer"
-                  onClick={() => handleStationSelect(station)}
+          <div>
+            {stations.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {stations.map((station) => {
+                  const availableSlots = getAvailableSlots(station);
+                  return (
+                    <div
+                      key={station.Id}
+                      className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 hover:border-zinc-700 transition-colors cursor-pointer"
+                      onClick={() => handleStationSelect(station)}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-white font-semibold text-lg">{station.Name}</h3>
+                        <div className="flex items-center gap-1">
+                          {getChargingTypeIcon(station.ChargingType)}
+                          <span className="text-sm text-gray-400">{station.ChargingType || 'Unknown'}</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-gray-400" />
+                          <span className="text-gray-300 text-sm">{formatLocationName(station.Location)}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4 text-gray-400" />
+                          <span className="text-gray-300 text-sm">
+                            {availableSlots.length} of {station.TotalSlots} slots available
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Zap className="w-4 h-4 text-gray-400" />
+                          <span className="text-gray-300 text-sm">{station.PowerOutput || 'N/A'}kW</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-4 border-t border-zinc-800">
+                        <div className="flex items-center justify-between">
+                          <span className="text-green-400 font-medium">
+                            {availableSlots.length > 0 ? 'Available Now' : 'Fully Booked'}
+                          </span>
+                          <span className="text-gray-400 text-sm">Click to book</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Battery className="mx-auto w-12 h-12 text-gray-400 mb-4" />
+                <p className="text-gray-400 text-lg mb-2">No charging stations available</p>
+                <p className="text-gray-500 text-sm mb-4">
+                  {error ? 'Unable to load stations. Please try again later.' : 'There are no charging stations to display.'}
+                </p>
+                <button
+                  onClick={fetchStations}
+                  className="bg-green-500 hover:bg-green-600 text-black font-semibold px-4 py-2 rounded-lg transition-colors"
                 >
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-white font-semibold text-lg">{station.Name}</h3>
-                    <div className="flex items-center gap-1">
-                      {getChargingTypeIcon(station.ChargingType)}
-                      <span className="text-sm text-gray-400">{station.ChargingType}</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-300 text-sm">{formatLocationName(station.Location)}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-300 text-sm">
-                        {availableSlots.length} of {station.TotalSlots} slots available
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-300 text-sm">{station.PowerOutput || 50}kW</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 pt-4 border-t border-zinc-800">
-                    <div className="flex items-center justify-between">
-                      <span className="text-green-400 font-medium">
-                        {availableSlots.length > 0 ? 'Available Now' : 'Fully Booked'}
-                      </span>
-                      <span className="text-gray-400 text-sm">Click to book</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                  Retry
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           // Booking Form
@@ -279,12 +322,12 @@ const EVOwnerBookStationPage = () => {
                     <p className="text-gray-400 text-xs uppercase tracking-wide">Charging Type</p>
                     <div className="flex items-center gap-2 mt-1">
                       {getChargingTypeIcon(selectedStation.ChargingType)}
-                      <span className="text-white">{selectedStation.ChargingType}</span>
+                      <span className="text-white">{selectedStation.ChargingType || 'Unknown'}</span>
                     </div>
                   </div>
                   <div>
                     <p className="text-gray-400 text-xs uppercase tracking-wide">Power</p>
-                    <p className="text-white font-medium">{selectedStation.PowerOutput || 50}kW</p>
+                    <p className="text-white font-medium">{selectedStation.PowerOutput || 'N/A'}kW</p>
                   </div>
                 </div>
 
