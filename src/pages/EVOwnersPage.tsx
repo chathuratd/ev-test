@@ -27,118 +27,44 @@ const EVOwnersPage = () => {
     fetchEvOwners();
   }, []);
 
-  useEffect(() => {
-    let filtered = evOwners;
-
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (owner) =>
-          owner.NIC.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          owner.FirstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          owner.LastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          owner.Email.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    setFilteredEvOwners(filtered);
-  }, [searchQuery, evOwners]);
-
   const fetchEvOwners = async () => {
     try {
       setLoading(true);
       
-      // Use fallback method that tries test endpoint first in development
-      const isDevelopment = import.meta.env.DEV;
-      const evOwnersData = isDevelopment ? 
-        await evOwnerService.getAllEVOwnersWithFallback() : 
-        await evOwnerService.getAllEVOwnersLegacy();
-        
-      setEvOwners(evOwnersData);
-      setFilteredEvOwners(evOwnersData);
+      // Build query parameters for backend filtering
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('searchTerm', searchQuery);
+      params.append('page', '1');
+      params.append('pageSize', '100');
+      
+      const response = await apiClient.get(`/EVOwners?${params.toString()}`);
+      
+      if (response.data.Success && response.data.Data) {
+        setEvOwners(response.data.Data);
+      }
     } catch (error) {
       console.error('Failed to fetch EV owners:', error);
       setEvOwners([]);
-      setFilteredEvOwners([]);
     } finally {
       setLoading(false);
     }
   };
 
 
-
-  const handleCreateOwner = async () => {
-    try {
-      if (!newOwner.NIC || !newOwner.FirstName || !newOwner.LastName || !newOwner.Email || !newOwner.Password) {
-        alert('Please fill in all required fields');
-        return;
-      }
-
-      if (newOwner.Password !== newOwner.ConfirmPassword) {
-        alert('Passwords do not match');
-        return;
-      }
-
-      const response = await evOwnerService.registerEVOwner(newOwner);
-      if (response.Success && response.Data) {
-        const newOwnerData: EVOwner = {
-          NIC: newOwner.NIC,
-          FirstName: newOwner.FirstName,
-          LastName: newOwner.LastName,
-          Email: newOwner.Email,
-          PhoneNumber: newOwner.PhoneNumber,
-          CreatedAt: new Date().toISOString(),
-        };
-        setEvOwners(prev => [...prev, newOwnerData]);
-        setShowCreateModal(false);
-        resetNewOwner();
-        alert('EV Owner registered successfully!');
-      } else {
-        alert(response.Message || 'Failed to register EV owner');
-      }
-    } catch (error) {
-      console.error('Failed to register EV owner:', error);
-      alert('Failed to register EV owner');
-    }
-  };
-
-  const resetNewOwner = () => {
-    setNewOwner({
-      NIC: '',
-      FirstName: '',
-      LastName: '',
-      Email: '',
-      PhoneNumber: '',
-      Password: '',
-      ConfirmPassword: ''
-    });
-  };
-
   const handleViewDetails = async (owner: EVOwner) => {
     setSelectedOwner(owner);
     setShowDetailsModal(true);
     
-    // Fetch owner's bookings (mock data for now)
-    const mockBookings: Booking[] = [
-      {
-        Id: '1',
-        EvOwnerNic: owner.NIC,
-        ChargingStationId: 'station-1',
-        SlotNumber: 1,
-        ReservationDateTime: '2025-10-09T10:00:00Z',
-        Status: BookingStatus.Confirmed,
-        CreatedAt: '2025-10-08T14:30:00Z',
-      },
-      {
-        Id: '2',
-        EvOwnerNic: owner.NIC,
-        ChargingStationId: 'station-2',
-        SlotNumber: 2,
-        ReservationDateTime: '2025-10-07T14:00:00Z',
-        Status: BookingStatus.Completed,
-        CreatedAt: '2025-10-07T12:15:00Z',
-      },
-    ];
-    setOwnerBookings(mockBookings);
+    // THIN CLIENT: Fetch owner's bookings from backend
+    try {
+      const response = await apiClient.get(`/Booking/evowner/${owner.NIC}`);
+      if (response.data.Success && response.data.Data) {
+        setOwnerBookings(response.data.Data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch bookings:', error);
+      setOwnerBookings([]);
+    }
   };
 
   const formatDateTime = (dateTimeString: string) => {
@@ -196,17 +122,10 @@ const EVOwnersPage = () => {
               />
             </div>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-black font-semibold px-4 py-2 rounded-lg transition-colors"
-          >
-            <UserPlus className="w-5 h-5" />
-            Register EV Owner
-          </button>
         </div>
 
         <div className="grid gap-4">
-          {filteredEvOwners.map((owner) => (
+          {evOwners.map((owner) => (
             <div key={owner.NIC} className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 hover:border-zinc-600 transition-colors">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-4">
@@ -262,112 +181,6 @@ const EVOwnersPage = () => {
           </div>
         )}
       </div>
-
-      {/* Create EV Owner Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-semibold text-white mb-4">Register New EV Owner</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">NIC *</label>
-                <input
-                  type="text"
-                  value={newOwner.NIC}
-                  onChange={(e) => setNewOwner({...newOwner, NIC: e.target.value})}
-                  placeholder="Enter NIC number"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">Email *</label>
-                <input
-                  type="email"
-                  value={newOwner.Email}
-                  onChange={(e) => setNewOwner({...newOwner, Email: e.target.value})}
-                  placeholder="Enter email address"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">First Name *</label>
-                <input
-                  type="text"
-                  value={newOwner.FirstName}
-                  onChange={(e) => setNewOwner({...newOwner, FirstName: e.target.value})}
-                  placeholder="Enter first name"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">Last Name *</label>
-                <input
-                  type="text"
-                  value={newOwner.LastName}
-                  onChange={(e) => setNewOwner({...newOwner, LastName: e.target.value})}
-                  placeholder="Enter last name"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">Phone Number</label>
-                <input
-                  type="tel"
-                  value={newOwner.PhoneNumber}
-                  onChange={(e) => setNewOwner({...newOwner, PhoneNumber: e.target.value})}
-                  placeholder="Enter phone number"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">Password *</label>
-                <input
-                  type="password"
-                  value={newOwner.Password}
-                  onChange={(e) => setNewOwner({...newOwner, Password: e.target.value})}
-                  placeholder="Enter password"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">Confirm Password *</label>
-                <input
-                  type="password"
-                  value={newOwner.ConfirmPassword}
-                  onChange={(e) => setNewOwner({...newOwner, ConfirmPassword: e.target.value})}
-                  placeholder="Confirm password"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-                />
-              </div>
-            </div>
-            
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={handleCreateOwner}
-                className="flex-1 bg-green-500 hover:bg-green-600 text-black font-semibold py-2 rounded-lg transition-colors"
-              >
-                Register EV Owner
-              </button>
-              <button
-                onClick={() => {
-                  setShowCreateModal(false);
-                  resetNewOwner();
-                }}
-                className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white font-semibold py-2 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Owner Details Modal */}
       {showDetailsModal && selectedOwner && (
