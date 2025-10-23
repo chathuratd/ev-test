@@ -8,7 +8,9 @@ import {
   UpdateSlotAvailabilityRequestDto,
   DeactivateStationRequest,
   UpdateSlotsRequest,
-  ChargingType
+  ChargingType,
+  ChargingStationSearchParams,
+  ChargingStationNearbyParams
 } from '../types';
 
 export const stationService = {
@@ -33,6 +35,36 @@ export const stationService = {
     return response.data;
   },
 
+  async searchStations(params: ChargingStationSearchParams): Promise<ApiResponse<ChargingStation[]>> {
+    const queryParams = new URLSearchParams();
+    
+    if (params.location) queryParams.append('location', params.location);
+    if (params.type) queryParams.append('type', params.type);
+    if (params.latitude !== undefined) queryParams.append('latitude', params.latitude.toString());
+    if (params.longitude !== undefined) queryParams.append('longitude', params.longitude.toString());
+    if (params.radiusKm !== undefined) queryParams.append('radiusKm', params.radiusKm.toString());
+    if (params.availableOnly !== undefined) queryParams.append('availableOnly', params.availableOnly.toString());
+    if (params.maxPricePerHour !== undefined) queryParams.append('maxPricePerHour', params.maxPricePerHour.toString());
+    if (params.page !== undefined) queryParams.append('page', params.page.toString());
+    if (params.pageSize !== undefined) queryParams.append('pageSize', params.pageSize.toString());
+
+    const response = await apiClient.get<ApiResponse<ChargingStation[]>>(`/ChargingStation/search?${queryParams.toString()}`);
+    return response.data;
+  },
+
+  async getNearbyStations(params: ChargingStationNearbyParams): Promise<ApiResponse<ChargingStation[]>> {
+    const queryParams = new URLSearchParams();
+    
+    if (params.latitude !== undefined) queryParams.append('latitude', params.latitude.toString());
+    if (params.longitude !== undefined) queryParams.append('longitude', params.longitude.toString());
+    if (params.radiusKm !== undefined) queryParams.append('radiusKm', params.radiusKm.toString());
+    if (params.availableOnly !== undefined) queryParams.append('availableOnly', params.availableOnly.toString());
+    if (params.limit !== undefined) queryParams.append('limit', params.limit.toString());
+
+    const response = await apiClient.get<ApiResponse<ChargingStation[]>>(`/ChargingStation/nearby?${queryParams.toString()}`);
+    return response.data;
+  },
+
   async updateSlotAvailability(id: string, request: UpdateSlotAvailabilityRequestDto): Promise<ApiResponse<void>> {
     const response = await apiClient.patch<ApiResponse<void>>(`/ChargingStation/${id}/slots`, request);
     return response.data;
@@ -43,6 +75,29 @@ export const stationService = {
     return response.data;
   },
 
+  // Legacy methods for backward compatibility
+  async getAllStationsLegacy(): Promise<ChargingStation[]> {
+    const response = await this.getAllStations();
+    return response.Success && response.Data ? response.Data : [];
+  },
+
+  async getStationByIdLegacy(id: string): Promise<ChargingStation> {
+    const response = await this.getStationById(id);
+    if (response.Success && response.Data) {
+      return response.Data;
+    }
+    throw new Error(response.Message || 'Station not found');
+  },
+
+  async searchStationsLegacy(params: ChargingStationSearchParams): Promise<ChargingStation[]> {
+    const response = await this.searchStations(params);
+    return response.Success && response.Data ? response.Data : [];
+  },
+
+  async getNearbyStationsLegacy(params: ChargingStationNearbyParams): Promise<ChargingStation[]> {
+    const response = await this.getNearbyStations(params);
+    return response.Success && response.Data ? response.Data : [];
+  },
 
   async updateSlots(id: string, slots: UpdateSlotsRequest): Promise<ChargingStation> {
     const request: UpdateSlotAvailabilityRequestDto = {

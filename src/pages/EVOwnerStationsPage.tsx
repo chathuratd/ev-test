@@ -136,7 +136,7 @@ const EVOwnerStationsPage = () => {
                 </div>
                 <div>
                   <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Charging Rate</p>
-                  <p className="text-white font-semibold">{station.ChargingType === ChargingType.DC ? '150kW' : '22kW'}</p>
+                  <p className="text-white font-semibold">{station.PowerOutput || 'N/A'}kW</p>
                 </div>
                 <div>
                   <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Contact</p>

@@ -57,10 +57,27 @@ const BookingsPage = () => {
       if (stationsResponse.Success && stationsResponse.Data) {
         setStations(stationsResponse.Data);
       }
+
+      // Fetch all bookings using the new method
+      const bookingsResponse = await bookingService.getAllBookings();
+      if (bookingsResponse.Success && bookingsResponse.Data) {
+        setBookings(bookingsResponse.Data);
+        setFilteredBookings(bookingsResponse.Data);
+      } else {
+        console.warn('Bookings API returned no data:', bookingsResponse.Message);
+        setBookings([]);
+        setFilteredBookings([]);
+      }
     } catch (error) {
-      console.error('Failed to fetch stations:', error);
+      console.error('Failed to fetch data:', error);
+      setBookings([]);
+      setFilteredBookings([]);
+    } finally {
+      setLoading(false);
     }
   };
+
+
 
   const handleStatusChange = async (bookingId: string, newStatus: BookingStatus) => {
     try {

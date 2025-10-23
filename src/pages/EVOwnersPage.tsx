@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, User, Mail, Phone, Eye, UserPlus } from 'lucide-react';
+import { Search, User, Clock, Mail, Phone, Eye, UserPlus } from 'lucide-react';
 import { evOwnerService } from '../services/evOwnerService';
 import { EVOwner, RegisterEVOwnerRequestDto, Booking, BookingStatus } from '../types';
 import apiClient from '../services/api';
@@ -25,30 +25,46 @@ const EVOwnersPage = () => {
   // THIN CLIENT: Fetch EV owners from backend with filtering
   useEffect(() => {
     fetchEvOwners();
-  }, [searchQuery]);
+  }, []);
+
+  useEffect(() => {
+    let filtered = evOwners;
+
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (owner) =>
+          owner.NIC.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          owner.FirstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          owner.LastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          owner.Email.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    setFilteredEvOwners(filtered);
+  }, [searchQuery, evOwners]);
 
   const fetchEvOwners = async () => {
     try {
       setLoading(true);
       
-      // Build query parameters for backend filtering
-      const params = new URLSearchParams();
-      if (searchQuery) params.append('searchTerm', searchQuery);
-      params.append('page', '1');
-      params.append('pageSize', '100');
-      
-      const response = await apiClient.get(`/api/v1/EVOwners?${params.toString()}`);
-      
-      if (response.data.Success && response.data.Data) {
-        setEvOwners(response.data.Data);
-      }
+      // Use fallback method that tries test endpoint first in development
+      const isDevelopment = import.meta.env.DEV;
+      const evOwnersData = isDevelopment ? 
+        await evOwnerService.getAllEVOwnersWithFallback() : 
+        await evOwnerService.getAllEVOwnersLegacy();
+        
+      setEvOwners(evOwnersData);
+      setFilteredEvOwners(evOwnersData);
     } catch (error) {
       console.error('Failed to fetch EV owners:', error);
       setEvOwners([]);
+      setFilteredEvOwners([]);
     } finally {
       setLoading(false);
     }
   };
+
+
 
   const handleCreateOwner = async () => {
     try {
@@ -63,9 +79,16 @@ const EVOwnersPage = () => {
       }
 
       const response = await evOwnerService.registerEVOwner(newOwner);
-      if (response.Success) {
-        // Refresh the list after successful registration
-        fetchEvOwners();
+      if (response.Success && response.Data) {
+        const newOwnerData: EVOwner = {
+          NIC: newOwner.NIC,
+          FirstName: newOwner.FirstName,
+          LastName: newOwner.LastName,
+          Email: newOwner.Email,
+          PhoneNumber: newOwner.PhoneNumber,
+          CreatedAt: new Date().toISOString(),
+        };
+        setEvOwners(prev => [...prev, newOwnerData]);
         setShowCreateModal(false);
         resetNewOwner();
         alert('EV Owner registered successfully!');
@@ -94,16 +117,28 @@ const EVOwnersPage = () => {
     setSelectedOwner(owner);
     setShowDetailsModal(true);
     
-    // THIN CLIENT: Fetch owner's bookings from backend
-    try {
-      const response = await apiClient.get(`/api/v1/Booking/evowner/${owner.NIC}`);
-      if (response.data.Success && response.data.Data) {
-        setOwnerBookings(response.data.Data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch bookings:', error);
-      setOwnerBookings([]);
-    }
+    // Fetch owner's bookings (mock data for now)
+    const mockBookings: Booking[] = [
+      {
+        Id: '1',
+        EvOwnerNic: owner.NIC,
+        ChargingStationId: 'station-1',
+        SlotNumber: 1,
+        ReservationDateTime: '2025-10-09T10:00:00Z',
+        Status: BookingStatus.Confirmed,
+        CreatedAt: '2025-10-08T14:30:00Z',
+      },
+      {
+        Id: '2',
+        EvOwnerNic: owner.NIC,
+        ChargingStationId: 'station-2',
+        SlotNumber: 2,
+        ReservationDateTime: '2025-10-07T14:00:00Z',
+        Status: BookingStatus.Completed,
+        CreatedAt: '2025-10-07T12:15:00Z',
+      },
+    ];
+    setOwnerBookings(mockBookings);
   };
 
   const formatDateTime = (dateTimeString: string) => {
@@ -171,7 +206,7 @@ const EVOwnersPage = () => {
         </div>
 
         <div className="grid gap-4">
-          {evOwners.map((owner) => (
+          {filteredEvOwners.map((owner) => (
             <div key={owner.NIC} className="bg-zinc-800 border border-zinc-700 rounded-lg p-6 hover:border-zinc-600 transition-colors">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-4">
@@ -192,7 +227,7 @@ const EVOwnersPage = () => {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex items-center gap-3">
                   <Mail className="w-5 h-5 text-gray-400" />
                   <div>
@@ -205,6 +240,13 @@ const EVOwnersPage = () => {
                   <div>
                     <p className="text-gray-400 text-xs uppercase tracking-wide">Phone</p>
                     <p className="text-white font-medium">{owner.PhoneNumber}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Clock className="w-5 h-5 text-gray-400" />
+                  <div>
+                    <p className="text-gray-400 text-xs uppercase tracking-wide">Registered</p>
+                    <p className="text-white font-medium">{formatDateTime(owner.CreatedAt || '')}</p>
                   </div>
                 </div>
               </div>
@@ -362,33 +404,37 @@ const EVOwnersPage = () => {
                     <p className="text-gray-400 text-sm">Phone</p>
                     <p className="text-white font-medium">{selectedOwner.PhoneNumber}</p>
                   </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">Registration Date</p>
+                    <p className="text-white font-medium">{formatDateTime(selectedOwner.CreatedAt || '')}</p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Booking History */}
-            <div className="mt-6">
-              <h4 className="text-lg font-semibold text-white mb-4">Booking History</h4>
-              <div className="space-y-3">
-                {ownerBookings.map((booking) => (
-                  <div key={booking.Id} className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-white font-medium">Booking #{booking.Id}</p>
-                        <p className="text-gray-400 text-sm">Station {booking.ChargingStationId} - Slot {booking.SlotNumber}</p>
-                        <p className="text-gray-400 text-sm">{formatDateTime(booking.ReservationDateTime)}</p>
+              {/* Booking History */}
+              <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
+                <h4 className="text-lg font-semibold text-white mb-4">Recent Bookings</h4>
+                <div className="space-y-3">
+                  {ownerBookings.map((booking) => (
+                    <div key={booking.Id} className="bg-zinc-700 border border-zinc-600 rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-white font-medium">Booking #{booking.Id}</p>
+                          <p className="text-gray-400 text-sm">Station {booking.ChargingStationId} - Slot {booking.SlotNumber}</p>
+                          <p className="text-gray-400 text-sm">{formatDateTime(booking.ReservationDateTime)}</p>
+                        </div>
+                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium border ${getStatusColor(booking.Status)}`}>
+                          {booking.Status}
+                        </span>
                       </div>
-                      <span className={`inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium border ${getStatusColor(booking.Status)}`}>
-                        {booking.Status}
-                      </span>
                     </div>
-                  </div>
-                ))}
-                {ownerBookings.length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-gray-400">No booking history found</p>
-                  </div>
-                )}
+                  ))}
+                  {ownerBookings.length === 0 && (
+                    <div className="text-center py-8">
+                      <p className="text-gray-400">No booking history found</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

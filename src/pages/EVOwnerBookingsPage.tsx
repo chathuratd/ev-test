@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Calendar, Clock, MapPin, Battery, AlertCircle, CheckCircle, XCircle, Search, Filter } from 'lucide-react';
 import { Booking, BookingStatus } from '../types';
-import apiClient from '../services/api';
+import { bookingService } from '../services/bookingService';
 
 const EVOwnerBookingsPage = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -27,15 +27,12 @@ const EVOwnerBookingsPage = () => {
         return;
       }
       
-      // Build query parameters for backend filtering
-      const params = new URLSearchParams();
-      if (searchQuery) params.append('searchTerm', searchQuery);
-      if (statusFilter !== 'all') params.append('status', statusFilter);
-      
-      // Fetch user bookings from API with backend filtering
-      const response = await apiClient.get(`/api/v1/Booking/evowner/${currentUserNIC}?${params.toString()}`);
-      if (response.data.Success && response.data.Data) {
-        setBookings(response.data.Data);
+      // Fetch user bookings using the booking service
+      const response = await bookingService.getBookingsByEvOwner(currentUserNIC);
+      if (response.Success && response.Data) {
+        const userBookings: Booking[] = response.Data;
+        setBookings(userBookings);
+        setFilteredBookings(userBookings);
       } else {
         setBookings([]);
       }
@@ -99,8 +96,8 @@ const EVOwnerBookingsPage = () => {
   const handleCancelBooking = async (bookingId: string) => {
     if (window.confirm('Are you sure you want to cancel this booking?')) {
       try {
-        // Call API to cancel booking
-        await apiClient.put('/api/v1/Booking/cancel', {
+        // Use the booking service to cancel booking
+        await bookingService.cancelBooking({
           BookingId: bookingId,
           CancellationReason: 'Cancelled by user'
         });
@@ -116,7 +113,7 @@ const EVOwnerBookingsPage = () => {
         alert('Booking cancelled successfully');
       } catch (error: any) {
         console.error('Failed to cancel booking:', error);
-        alert('Failed to cancel booking: ' + (error.response?.data?.Message || error.message));
+        alert('Failed to cancel booking: ' + (error.message || 'Unknown error'));
       }
     }
   };
@@ -210,7 +207,7 @@ const EVOwnerBookingsPage = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex items-center gap-3">
                   <MapPin className="w-5 h-5 text-gray-400" />
                   <div>
@@ -228,15 +225,8 @@ const EVOwnerBookingsPage = () => {
                 <div className="flex items-center gap-3">
                   <Clock className="w-5 h-5 text-gray-400" />
                   <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-wide">Duration</p>
-                    <p className="text-white font-medium">2 hours</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Battery className="w-5 h-5 text-gray-400" />
-                  <div>
-                    <p className="text-gray-400 text-xs uppercase tracking-wide">Charging Type</p>
-                    <p className="text-white font-medium">DC Fast</p>
+                    <p className="text-gray-400 text-xs uppercase tracking-wide">Status</p>
+                    <p className="text-white font-medium">{booking.Status}</p>
                   </div>
                 </div>
               </div>

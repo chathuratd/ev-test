@@ -6,10 +6,25 @@ import {
   UpdateBookingRequestDto,
   CancelBookingRequestDto,
   ConfirmBookingRequestDto,
-  CompleteBookingRequestDto
+  CompleteBookingRequestDto,
+  BookingQueryParams
 } from '../types';
 
 export const bookingService = {
+  async getAllBookings(params?: BookingQueryParams): Promise<ApiResponse<Booking[]>> {
+    const queryParams = new URLSearchParams();
+    
+    if (params?.page !== undefined) queryParams.append('page', params.page.toString());
+    if (params?.pageSize !== undefined) queryParams.append('pageSize', params.pageSize.toString());
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.evOwnerNic) queryParams.append('evOwnerNic', params.evOwnerNic);
+    if (params?.fromDate) queryParams.append('fromDate', params.fromDate);
+    if (params?.toDate) queryParams.append('toDate', params.toDate);
+
+    const response = await apiClient.get<ApiResponse<Booking[]>>(`/Booking?${queryParams.toString()}`);
+    return response.data;
+  },
+
   async createBooking(booking: CreateBookingRequestDto): Promise<ApiResponse<Booking>> {
     const response = await apiClient.post<ApiResponse<Booking>>('/Booking', booking);
     return response.data;
@@ -22,6 +37,11 @@ export const bookingService = {
 
   async getBookingsByEvOwner(evOwnerNic: string): Promise<ApiResponse<Booking[]>> {
     const response = await apiClient.get<ApiResponse<Booking[]>>(`/Booking/evowner/${evOwnerNic}`);
+    return response.data;
+  },
+
+  async getBookingsByUser(userId: string): Promise<ApiResponse<Booking[]>> {
+    const response = await apiClient.get<ApiResponse<Booking[]>>(`/Booking/user/${userId}`);
     return response.data;
   },
 
@@ -45,7 +65,33 @@ export const bookingService = {
     return response.data;
   },
 
-  // Convenience methods that return data directly
+  // New dashboard endpoints
+  async getBookingCounts(): Promise<ApiResponse<any>> {
+    const response = await apiClient.get<ApiResponse<any>>('/Booking/counts');
+    return response.data;
+  },
+
+  async getUpcomingBookings(): Promise<ApiResponse<Booking[]>> {
+    const response = await apiClient.get<ApiResponse<Booking[]>>('/Booking/upcoming');
+    return response.data;
+  },
+
+  async getCompletedBookings(): Promise<ApiResponse<Booking[]>> {
+    const response = await apiClient.get<ApiResponse<Booking[]>>('/Booking/completed');
+    return response.data;
+  },
+
+  async getCancelledBookings(): Promise<ApiResponse<Booking[]>> {
+    const response = await apiClient.get<ApiResponse<Booking[]>>('/Booking/cancelled');
+    return response.data;
+  },
+
+  // Legacy methods for backward compatibility
+  async getAllBookingsLegacy(): Promise<Booking[]> {
+    const response = await this.getAllBookings();
+    return response.Success && response.Data ? response.Data : [];
+  },
+
   async createBookingDirect(booking: CreateBookingRequestDto): Promise<Booking> {
     const response = await this.createBooking(booking);
     if (response.Success && response.Data) {
@@ -70,11 +116,45 @@ export const bookingService = {
     throw new Error(response.Message || 'Failed to fetch bookings');
   },
 
-  // Legacy methods for backward compatibility
-  async getAllBookingsLegacy(): Promise<Booking[]> {
-    // Since there's no "get all bookings" endpoint, we'll return mock data
-    // In a real implementation, you might need to aggregate from multiple sources
-    return [];
+  async getBookingsByUserDirect(userId: string): Promise<Booking[]> {
+    const response = await this.getBookingsByUser(userId);
+    if (response.Success && response.Data) {
+      return response.Data;
+    }
+    throw new Error(response.Message || 'Failed to fetch user bookings');
+  },
+
+  // Direct methods for new dashboard endpoints
+  async getBookingCountsDirect(): Promise<any> {
+    const response = await this.getBookingCounts();
+    if (response.Success && response.Data) {
+      return response.Data;
+    }
+    throw new Error(response.Message || 'Failed to fetch booking counts');
+  },
+
+  async getUpcomingBookingsDirect(): Promise<Booking[]> {
+    const response = await this.getUpcomingBookings();
+    if (response.Success && response.Data) {
+      return response.Data;
+    }
+    throw new Error(response.Message || 'Failed to fetch upcoming bookings');
+  },
+
+  async getCompletedBookingsDirect(): Promise<Booking[]> {
+    const response = await this.getCompletedBookings();
+    if (response.Success && response.Data) {
+      return response.Data;
+    }
+    throw new Error(response.Message || 'Failed to fetch completed bookings');
+  },
+
+  async getCancelledBookingsDirect(): Promise<Booking[]> {
+    const response = await this.getCancelledBookings();
+    if (response.Success && response.Data) {
+      return response.Data;
+    }
+    throw new Error(response.Message || 'Failed to fetch cancelled bookings');
   },
 
   async updateBookingLegacy(bookingId: string, newDateTime: string): Promise<Booking> {

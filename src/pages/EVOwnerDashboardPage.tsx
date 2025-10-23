@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Calendar, Clock, MapPin, Battery, ChevronRight, Plus, AlertCircle, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { stationService } from '../services/stationService';
+import { bookingService } from '../services/bookingService';
 import { Booking, ChargingStation, BookingStatus } from '../types';
-import apiClient from '../services/api';
 
 interface DashboardStats {
   pendingReservations: number;
@@ -34,32 +34,37 @@ const EVOwnerDashboardPage: React.FC = () => {
       setLoading(true);
       setError('');
       
-      // Get current user NIC from localStorage (set during login)
-      const currentUserNIC = localStorage.getItem('userNic') || localStorage.getItem('evOwnerNic');
-      
-      if (!currentUserNIC) {
-        console.error('No user NIC found in localStorage');
-        navigate('/ev-owner-login');
-        return;
+      // Fetch booking counts from dedicated API endpoint
+      try {
+        const countsResponse = await bookingService.getBookingCounts();
+        if (countsResponse.Success && countsResponse.Data) {
+          const counts = countsResponse.Data;
+          setStats(prev => ({
+            ...prev,
+            pendingReservations: counts.pendingCount || 0,
+            approvedReservations: counts.confirmedCount || 0,
+            totalBookings: counts.totalCount || 0,
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching booking counts:', error);
+        // Continue with other data even if counts fail
       }
-      
-      // THIN CLIENT: Use backend endpoint for dashboard stats
-      // Backend calculates: pending, approved, completed counts, recent bookings, etc.
-      const statsResponse = await apiClient.get(`/api/v1/EVOwners/${currentUserNIC}/dashboard-stats`);
-      
-      if (statsResponse.data.Success && statsResponse.data.Data) {
-        const dashboardData = statsResponse.data.Data;
-        
-        // Use backend-calculated statistics directly
-        setStats({
-          pendingReservations: dashboardData.PendingReservations || 0,
-          approvedReservations: dashboardData.ApprovedReservations || 0,
-          totalBookings: dashboardData.TotalBookings || 0,
-          nearbyStations: 0 // Will be updated from stations API
-        });
-        
-        // Use backend-provided recent bookings (already sorted and limited)
-        setRecentBookings(dashboardData.RecentBookings || []);
+
+      // Fetch upcoming bookings for recent bookings display
+      try {
+        const upcomingResponse = await bookingService.getUpcomingBookings();
+        if (upcomingResponse.Success && upcomingResponse.Data) {
+          const upcomingBookings = upcomingResponse.Data;
+          // Sort by reservation date and take first 5
+          const sortedBookings = upcomingBookings.sort((a, b) => 
+            new Date(a.ReservationDateTime).getTime() - new Date(b.ReservationDateTime).getTime()
+          );
+          setRecentBookings(sortedBookings.slice(0, 5));
+        }
+      } catch (error) {
+        console.error('Error fetching upcoming bookings:', error);
+        setRecentBookings([]);
       }
       
       // Fetch all stations from API
