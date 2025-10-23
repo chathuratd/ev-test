@@ -26,7 +26,7 @@ const StationsPage: React.FC = () => {
       params.append('page', '1');
       params.append('pageSize', '100');
       
-      const response = await apiClient.get(`/api/v1/ChargingStation/search?${params.toString()}`);
+      const response = await apiClient.get(`/ChargingStation`);
       if (response.data.Success && response.data.Data) {
         setStations(response.data.Data);
       } else {
@@ -42,14 +42,19 @@ const StationsPage: React.FC = () => {
 
   const handleActivateDeactivate = async (id: string, currentStatus: string) => {
     try {
-      if (currentStatus === 'active') {
+      const normalizedStatus = currentStatus?.toLowerCase();
+
+      if (normalizedStatus === 'active') {
+        // Navigate to deactivation page (only active stations can be deactivated)
         navigate(`/stations/${id}/deactivate`);
       } else {
+        // Activate the station (only inactive stations can be activated)
         await stationService.activateStation(id);
         fetchStations();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update station status:', error);
+      alert(error.message || 'Failed to update station status. Please try again.');
     }
   };
 
@@ -144,7 +149,7 @@ const StationsPage: React.FC = () => {
                   <td className="py-4 px-4">
                     <span
                       className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
-                        station.Status === 'active'
+                        station.Status?.toLowerCase() === 'active'
                           ? 'bg-green-500/10 text-green-400'
                           : 'bg-gray-500/10 text-gray-400'
                       }`}
@@ -160,16 +165,21 @@ const StationsPage: React.FC = () => {
                       >
                         Edit
                       </button>
-                      <button
-                        onClick={() => handleActivateDeactivate(station.Id, station.Status as string)}
-                        className={`font-medium text-sm transition-colors ${
-                          station.Status === 'active'
-                            ? 'text-gray-400 hover:text-red-400'
-                            : 'text-green-400 hover:text-green-300'
-                        }`}
-                      >
-                        {station.Status === 'active' ? 'Deactivate' : 'Activate'}
-                      </button>
+                      {station.Status?.toLowerCase() === 'active' ? (
+                        <button
+                          onClick={() => handleActivateDeactivate(station.Id, station.Status as string)}
+                          className="text-gray-400 hover:text-red-400 font-medium text-sm transition-colors"
+                        >
+                          Deactivate
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleActivateDeactivate(station.Id, station.Status as string)}
+                          className="text-green-400 hover:text-green-300 font-medium text-sm transition-colors"
+                        >
+                          Activate
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

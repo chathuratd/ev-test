@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import StationsPage from './pages/StationsPage';
 import StationFormPage from './pages/StationFormPage';
+import DeactivateStationPage from './pages/DeactivateStationPage';
 import UsersPage from './pages/UsersPage';
 import EVOwnersPage from './pages/EVOwnersPage';
 import BookingsPage from './pages/BookingsPage';
@@ -31,6 +32,7 @@ function App() {
             <Route path="stations" element={<StationsPage />} />
             <Route path="stations/new" element={<StationFormPage />} />
             <Route path="stations/:id/edit" element={<StationFormPage />} />
+            <Route path="stations/:id/deactivate" element={<DeactivateStationPage />} />
             <Route path="users" element={<UsersPage />} />
             <Route path="ev-owners" element={<EVOwnersPage />} />
             <Route path="bookings" element={<BookingsPage />} />
