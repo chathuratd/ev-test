@@ -2,14 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search } from 'lucide-react';
 import { stationService } from '../services/stationService';
-import { ChargingStation } from '../types';
+import { ChargingStation, UserRole } from '../types';
 import apiClient from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const StationsPage: React.FC = () => {
   const [stations, setStations] = useState<ChargingStation[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const isStationOperator = user?.Role === UserRole.StationOperator;
 
   // THIN CLIENT: Fetch stations from backend with search filtering
   useEffect(() => {
@@ -85,13 +89,15 @@ const StationsPage: React.FC = () => {
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
             />
           </div>
-          <button
-            onClick={() => navigate('/stations/new')}
-            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-black font-semibold px-4 py-2 rounded-lg transition-colors ml-4"
-          >
-            <Plus className="w-5 h-5" />
-            Add Station
-          </button>
+          {!isStationOperator && (
+            <button
+              onClick={() => navigate('/stations/new')}
+              className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-black font-semibold px-4 py-2 rounded-lg transition-colors ml-4"
+            >
+              <Plus className="w-5 h-5" />
+              Add Station
+            </button>
+          )}
         </div>
 
         <div className="overflow-x-auto">
@@ -165,7 +171,7 @@ const StationsPage: React.FC = () => {
                       >
                         Edit
                       </button>
-                      {station.Status?.toLowerCase() === 'active' ? (
+                      {station.Status?.toLowerCase() === 'active' && !isStationOperator ? (
                         <button
                           onClick={() => handleActivateDeactivate(station.Id, station.Status as string)}
                           className="text-gray-400 hover:text-red-400 font-medium text-sm transition-colors"
@@ -173,12 +179,15 @@ const StationsPage: React.FC = () => {
                           Deactivate
                         </button>
                       ) : (
-                        <button
-                          onClick={() => handleActivateDeactivate(station.Id, station.Status as string)}
-                          className="text-green-400 hover:text-green-300 font-medium text-sm transition-colors"
-                        >
-                          Activate
-                        </button>
+                        // Only Backoffice can activate stations
+                        !isStationOperator && (
+                          <button
+                            onClick={() => handleActivateDeactivate(station.Id, station.Status as string)}
+                            className="text-green-400 hover:text-green-300 font-medium text-sm transition-colors"
+                          >
+                            Activate
+                          </button>
+                        )
                       )}
                     </div>
                   </td>
