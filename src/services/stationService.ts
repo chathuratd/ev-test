@@ -75,6 +75,11 @@ export const stationService = {
     return response.data;
   },
 
+  async getStationsByOperator(operatorId: string): Promise<ApiResponse<ChargingStation[]>> {
+    const response = await apiClient.get<ApiResponse<ChargingStation[]>>(`/ChargingStation/operator/${operatorId}`);
+    return response.data;
+  },
+
   // Legacy methods for backward compatibility
   async getAllStationsLegacy(): Promise<ChargingStation[]> {
     const response = await this.getAllStations();

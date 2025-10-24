@@ -23,16 +23,19 @@ const StationsPage: React.FC = () => {
   const fetchStations = async () => {
     try {
       setLoading(true);
-      
-      // Use backend search endpoint with query parameters
-      const params = new URLSearchParams();
-      if (searchQuery) params.append('searchTerm', searchQuery);
-      params.append('page', '1');
-      params.append('pageSize', '100');
-      
-      const response = await apiClient.get(`/ChargingStation`);
-      if (response.data.Success && response.data.Data) {
-        setStations(response.data.Data);
+
+      let response;
+
+      // Station Operators only see their assigned stations
+      if (isStationOperator && user?.Id) {
+        response = await stationService.getStationsByOperator(user.Id);
+      } else {
+        // Backoffice users see all stations
+        response = await stationService.getAllStations();
+      }
+
+      if (response.Success && response.Data) {
+        setStations(response.Data);
       } else {
         setStations([]);
       }

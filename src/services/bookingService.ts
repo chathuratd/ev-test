@@ -86,6 +86,11 @@ export const bookingService = {
     return response.data;
   },
 
+  async getBookingsByOperator(operatorId: string): Promise<ApiResponse<Booking[]>> {
+    const response = await apiClient.get<ApiResponse<Booking[]>>(`/Booking/operator/${operatorId}`);
+    return response.data;
+  },
+
   // Legacy methods for backward compatibility
   async getAllBookingsLegacy(): Promise<Booking[]> {
     const response = await this.getAllBookings();

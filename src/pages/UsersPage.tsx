@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Plus, Search } from 'lucide-react';
 import { userService } from '../services/userService';
-import { User, UserRole, AccountStatus, CreateUserRequestDto } from '../types';
+import { User, UserRole, AccountStatus, CreateUserRequestDto, UpdateUserRequestDto } from '../types';
 import AddUserModal from '../components/users/AddUserModal';
+import EditUserModal from '../components/users/EditUserModal';
 
 const UsersPage = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -10,6 +11,8 @@ const UsersPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -95,6 +98,48 @@ const UsersPage = () => {
     }
   };
 
+  const handleEditUser = async (userData: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: UserRole;
+    status: AccountStatus;
+    assignedStationIds: string[];
+  }) => {
+    if (!selectedUser) return;
+
+    try {
+      const updateRequest: UpdateUserRequestDto = {
+        Email: userData.email,
+        FirstName: userData.firstName,
+        LastName: userData.lastName,
+        Role: userData.role,
+        Status: userData.status,
+        AssignedStationIds: userData.assignedStationIds
+      };
+
+      const response = await userService.updateUser(selectedUser.Id, updateRequest);
+      if (response.Success) {
+        fetchUsers(); // Refresh the user list
+        setSelectedUser(null);
+      } else {
+        // Backend validation error from API response
+        throw new Error(response.Message || 'Failed to update user');
+      }
+    } catch (error: any) {
+      // Extract error message from backend
+      if (error.response?.data?.Message) {
+        throw new Error(error.response.data.Message);
+      } else if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      } else if (error.message) {
+        throw error;
+      } else {
+        throw new Error('Failed to update user. Please try again.');
+      }
+    }
+  };
+
   const handleAddUser = async (userData: {
     username: string;
     email: string;
@@ -102,6 +147,7 @@ const UsersPage = () => {
     firstName: string;
     lastName: string;
     role: UserRole;
+    assignedStationIds: string[];
   }) => {
     try {
       const createRequest: CreateUserRequestDto = {
@@ -111,7 +157,7 @@ const UsersPage = () => {
         FirstName: userData.firstName,
         LastName: userData.lastName,
         Role: userData.role,
-        AssignedStationIds: [] // Empty for now as specified
+        AssignedStationIds: userData.assignedStationIds
       };
 
       const response = await userService.createUser(createRequest);
@@ -183,6 +229,7 @@ const UsersPage = () => {
                 <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Name</th>
                 <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Email</th>
                 <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Role</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Assigned Stations</th>
                 <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Status</th>
                 <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Actions</th>
               </tr>
@@ -205,6 +252,15 @@ const UsersPage = () => {
                     </span>
                   </td>
                   <td className="py-4 px-4">
+                    {user.Role === UserRole.StationOperator ? (
+                      <span className="text-white">
+                        {user.AssignedStationIds?.length || 0} station{user.AssignedStationIds?.length !== 1 ? 's' : ''}
+                      </span>
+                    ) : (
+                      <span className="text-gray-500 text-sm">N/A</span>
+                    )}
+                  </td>
+                  <td className="py-4 px-4">
                     <span
                       className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
                         user.Status === AccountStatus.Active
@@ -218,7 +274,10 @@ const UsersPage = () => {
                   <td className="py-4 px-4">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => {}}
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setIsEditModalOpen(true);
+                        }}
                         className="text-white hover:text-green-400 font-medium text-sm transition-colors"
                       >
                         Edit
@@ -249,6 +308,17 @@ const UsersPage = () => {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSubmit={handleAddUser}
+      />
+
+      {/* Edit User Modal */}
+      <EditUserModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedUser(null);
+        }}
+        onSubmit={handleEditUser}
+        user={selectedUser}
       />
     </div>
   );

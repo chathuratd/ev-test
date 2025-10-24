@@ -1,48 +1,55 @@
+
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { UserRole, ChargingStation } from '../../types';
+import { User, UserRole, AccountStatus, ChargingStation } from '../../types';
 import { stationService } from '../../services/stationService';
 
-interface AddUserModalProps {
+interface EditUserModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (userData: {
-    username: string;
     email: string;
-    password: string;
     firstName: string;
     lastName: string;
     role: UserRole;
+    status: AccountStatus;
     assignedStationIds: string[];
   }) => Promise<void>;
+  user: User | null;
 }
 
-const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSubmit }) => {
+const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, onSubmit, user }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [stations, setStations] = useState<ChargingStation[]>([]);
   const [loadingStations, setLoadingStations] = useState(false);
   const [formData, setFormData] = useState({
-    username: '',
     email: '',
-    password: '',
-    confirmPassword: '',
     firstName: '',
     lastName: '',
     role: UserRole.StationOperator as UserRole,
+    status: AccountStatus.Active as AccountStatus,
     assignedStationIds: [] as string[]
   });
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && user) {
+      setFormData({
+        email: user.Email || '',
+        firstName: user.FirstName || '',
+        lastName: user.LastName || '',
+        role: user.Role || UserRole.StationOperator,
+        status: user.Status || AccountStatus.Active,
+        assignedStationIds: user.AssignedStationIds || []
+      });
       fetchStations();
     }
-  }, [isOpen]);
+  }, [isOpen, user]);
 
   const fetchStations = async () => {
     try {
       setLoadingStations(true);
-      const response = await stationService.getAllStations(true);
+      const response = await stationService.getAllStations();
       if (response.Success && response.Data) {
         setStations(response.Data);
       }
@@ -69,30 +76,18 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSubmit }
     try {
       setLoading(true);
       await onSubmit({
-        username: formData.username,
         email: formData.email,
-        password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
         role: formData.role,
+        status: formData.status,
         assignedStationIds: formData.assignedStationIds
       });
 
-      // Reset form and close modal on success
-      setFormData({
-        username: '',
-        email: '',
-        password: '',
-        confirmPassword: '',
-        firstName: '',
-        lastName: '',
-        role: UserRole.StationOperator,
-        assignedStationIds: []
-      });
       onClose();
     } catch (err: any) {
       // Display backend validation errors
-      setError(err.message || 'Failed to create user');
+      setError(err.message || 'Failed to update user');
     } finally {
       setLoading(false);
     }
@@ -100,29 +95,22 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSubmit }
 
   const handleClose = () => {
     if (!loading) {
-      setFormData({
-        username: '',
-        email: '',
-        password: '',
-        confirmPassword: '',
-        firstName: '',
-        lastName: '',
-        role: UserRole.StationOperator,
-        assignedStationIds: []
-      });
       setError('');
       onClose();
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !user) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div className="bg-zinc-900 border border-zinc-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-          <h2 className="text-2xl font-bold text-white">Add New User</h2>
+          <div>
+            <h2 className="text-2xl font-bold text-white">Edit User</h2>
+            <p className="text-gray-400 text-sm mt-1">Username: {user.Username}</p>
+          </div>
           <button
             onClick={handleClose}
             disabled={loading}
@@ -141,21 +129,6 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSubmit }
           )}
 
           <div className="space-y-6">
-            {/* Username */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Username
-              </label>
-              <input
-                type="text"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                placeholder="Enter username"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-                disabled={loading}
-              />
-            </div>
-
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -201,36 +174,6 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSubmit }
               </div>
             </div>
 
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Password
-              </label>
-              <input
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Enter password"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-                disabled={loading}
-              />
-            </div>
-
-            {/* Confirm Password */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                placeholder="Re-enter password"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-                disabled={loading}
-              />
-            </div>
-
             {/* Role */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -245,11 +188,23 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSubmit }
                 <option value={UserRole.StationOperator}>Station Operator</option>
                 <option value={UserRole.Backoffice}>Backoffice</option>
               </select>
-              <p className="mt-2 text-sm text-gray-400">
-                {formData.role === UserRole.Backoffice
-                  ? 'Backoffice users have full administrative access'
-                  : 'Station Operators can manage assigned charging stations'}
-              </p>
+            </div>
+
+            {/* Status */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Status
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as AccountStatus })}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-green-500"
+                disabled={loading}
+              >
+                <option value={AccountStatus.Active}>Active</option>
+                <option value={AccountStatus.Inactive}>Inactive</option>
+                <option value={AccountStatus.Suspended}>Suspended</option>
+              </select>
             </div>
 
             {/* Assigned Stations - Only for Station Operators */}
@@ -311,7 +266,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSubmit }
               disabled={loading}
               className="bg-green-500 hover:bg-green-600 text-black font-semibold px-6 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Creating...' : 'Create User'}
+              {loading ? 'Updating...' : 'Update User'}
             </button>
             <button
               type="button"
@@ -328,4 +283,4 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSubmit }
   );
 };
 
-export default AddUserModal;
+export default EditUserModal;
