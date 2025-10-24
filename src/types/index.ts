@@ -206,6 +206,7 @@ export interface EVOwner {
   LastName: string;
   Email: string;
   PhoneNumber: string;
+  Status?: AccountStatus;
   FullName?: string;
   CreatedAt?: string;
   UpdatedAt?: string;
