@@ -1,41 +1,20 @@
 import apiClient from './api';
-import { DashboardStats, RecentBooking, StationUtilization, ApiResponse, Booking } from '../types';
+import { DashboardStats, RecentBooking, StationUtilization, ApiResponse, Booking, BackendDashboardStats, BackendStationUtilization } from '../types';
 
 export const dashboardService = {
-  async getStats(): Promise<ApiResponse<DashboardStats>> {
-    const response = await apiClient.get<ApiResponse<DashboardStats>>('/Dashboard/stats');
+  // Core API methods
+  async getStats(): Promise<ApiResponse<BackendDashboardStats>> {
+    const response = await apiClient.get<ApiResponse<BackendDashboardStats>>('/Dashboard/stats');
     return response.data;
   },
 
-  async getRecentBookings(count: number = 10): Promise<ApiResponse<RecentBooking[]>> {
-    const response = await apiClient.get<ApiResponse<RecentBooking[]>>(`/Dashboard/recent-bookings?count=${count}`);
+  async getStationUtilization(): Promise<ApiResponse<BackendStationUtilization[]>> {
+    const response = await apiClient.get<ApiResponse<BackendStationUtilization[]>>('/Dashboard/station-utilization');
     return response.data;
   },
 
-  async getStationUtilization(): Promise<ApiResponse<StationUtilization[]>> {
-    const response = await apiClient.get<ApiResponse<StationUtilization[]>>('/Dashboard/station-utilization');
-    return response.data;
-  },
-
-  // New test endpoints for development/debugging
-  async getTestStats(): Promise<ApiResponse<DashboardStats>> {
-    const response = await apiClient.get<ApiResponse<DashboardStats>>('/Dashboard/test-stats');
-    return response.data;
-  },
-
-  async getTestRecentBookings(count: number = 10): Promise<ApiResponse<RecentBooking[]>> {
-    const response = await apiClient.get<ApiResponse<RecentBooking[]>>(`/Dashboard/test-recent-bookings?count=${count}`);
-    return response.data;
-  },
-
-  async getTestStationUtilization(): Promise<ApiResponse<StationUtilization[]>> {
-    const response = await apiClient.get<ApiResponse<StationUtilization[]>>('/Dashboard/test-station-utilization');
-    return response.data;
-  },
-
-  // New booking endpoints for enhanced dashboard
-  async getBookingCounts(): Promise<ApiResponse<any>> {
-    const response = await apiClient.get<ApiResponse<any>>('/Booking/counts');
+  async getRecentBookings(count: number = 10): Promise<ApiResponse<Booking[]>> {
+    const response = await apiClient.get<ApiResponse<Booking[]>>(`/Dashboard/recent-bookings?count=${count}`);
     return response.data;
   },
 
@@ -44,172 +23,147 @@ export const dashboardService = {
     return response.data;
   },
 
-  async getCompletedBookings(): Promise<ApiResponse<Booking[]>> {
-    const response = await apiClient.get<ApiResponse<Booking[]>>('/Booking/completed');
-    return response.data;
-  },
-
-  async getCancelledBookings(): Promise<ApiResponse<Booking[]>> {
-    const response = await apiClient.get<ApiResponse<Booking[]>>('/Booking/cancelled');
-    return response.data;
-  },
-
-  // Legacy methods for backward compatibility
-  async getStatsLegacy(): Promise<DashboardStats> {
+  // Transformation methods that convert backend responses to frontend format
+  async getStatsTransformed(): Promise<DashboardStats> {
     const response = await this.getStats();
     if (response.Success && response.Data) {
-      return response.Data;
+      const data = response.Data;
+      return {
+        totalBookings: data.TotalBookings || 0,
+        activeStations: data.ActiveStations || 0,
+        evOwners: data.TotalEVOwners || 0,
+        revenue: data.TotalRevenue || 0,
+        bookingsChange: 0, // Backend doesn't provide this
+        evOwnersChange: 0, // Backend doesn't provide this
+        revenueChange: 0, // Backend doesn't provide this
+        stationsInMaintenance: data.InactiveStations || 0,
+        pendingBookings: data.PendingBookings || 0,
+        confirmedBookings: data.ConfirmedBookings || 0,
+        completedBookings: data.CompletedBookings || 0,
+      };
     }
     throw new Error(response.Message || 'Failed to fetch dashboard stats');
   },
 
-  async getRecentBookingsLegacy(): Promise<RecentBooking[]> {
-    const response = await this.getRecentBookings();
-    if (response.Success && response.Data) {
-      return response.Data;
-    }
-    throw new Error(response.Message || 'Failed to fetch recent bookings');
-  },
-
-  async getStationUtilizationLegacy(): Promise<StationUtilization[]> {
+  async getStationUtilizationTransformed(): Promise<StationUtilization[]> {
     const response = await this.getStationUtilization();
     if (response.Success && response.Data) {
-      return response.Data;
+      // Transform, sort by utilization (highest first), and take top 5
+      return response.Data
+        .map((station: BackendStationUtilization) => ({
+          stationName: station.StationName || 'Unknown Station',
+          utilizationPercentage: Math.round(station.UtilizationPercentage || 0),
+        }))
+        .sort((a, b) => b.utilizationPercentage - a.utilizationPercentage)
+        .slice(0, 5);
     }
     throw new Error(response.Message || 'Failed to fetch station utilization');
   },
 
-  // Test endpoint legacy methods (for development)
-  async getTestStatsLegacy(): Promise<DashboardStats> {
-    const response = await this.getTestStats();
-    if (response.Success && response.Data) {
-      return response.Data;
-    }
-    throw new Error(response.Message || 'Failed to fetch test dashboard stats');
-  },
-
-  async getTestRecentBookingsLegacy(): Promise<RecentBooking[]> {
-    const response = await this.getTestRecentBookings();
-    if (response.Success && response.Data) {
-      return response.Data;
-    }
-    throw new Error(response.Message || 'Failed to fetch test recent bookings');
-  },
-
-  async getTestStationUtilizationLegacy(): Promise<StationUtilization[]> {
-    const response = await this.getTestStationUtilization();
-    if (response.Success && response.Data) {
-      return response.Data;
-    }
-    throw new Error(response.Message || 'Failed to fetch test station utilization');
-  },
-
-  // New booking endpoint legacy methods
-  async getBookingCountsLegacy(): Promise<any> {
-    const response = await this.getBookingCounts();
-    if (response.Success && response.Data) {
-      return response.Data;
-    }
-    throw new Error(response.Message || 'Failed to fetch booking counts');
-  },
-
-  async getUpcomingBookingsLegacy(): Promise<Booking[]> {
-    const response = await this.getUpcomingBookings();
-    if (response.Success && response.Data) {
-      return response.Data;
-    }
-    throw new Error(response.Message || 'Failed to fetch upcoming bookings');
-  },
-
-  async getCompletedBookingsLegacy(): Promise<Booking[]> {
-    const response = await this.getCompletedBookings();
-    if (response.Success && response.Data) {
-      return response.Data;
-    }
-    throw new Error(response.Message || 'Failed to fetch completed bookings');
-  },
-
-  async getCancelledBookingsLegacy(): Promise<Booking[]> {
-    const response = await this.getCancelledBookings();
-    if (response.Success && response.Data) {
-      return response.Data;
-    }
-    throw new Error(response.Message || 'Failed to fetch cancelled bookings');
-  },
-
-  // Development helper method to try test endpoints first, then fallback to production
-  async getStatsWithFallback(): Promise<DashboardStats> {
+  async getRecentBookingsTransformed(): Promise<RecentBooking[]> {
     try {
-      // Try test endpoint first (useful for development)
-      return await this.getTestStatsLegacy();
+      // Use the actual recent-bookings endpoint
+      const recentResponse = await this.getRecentBookings(10);
+      if (recentResponse.Success && recentResponse.Data) {
+        // Transform the bookings
+        return recentResponse.Data.map((booking: Booking) => ({
+          customerName: booking.EvOwnerName || booking.EvOwnerNic || 'Unknown',
+          stationLocation: booking.ChargingStationName || booking.StationLocation || 'Unknown Location',
+          timeAgo: this.getTimeAgo(booking.CreatedAt || booking.ReservationDateTime),
+        }));
+      }
     } catch (error) {
-      console.warn('Test stats endpoint failed, trying production:', error);
-      return await this.getStatsLegacy();
+      console.warn('Failed to fetch recent bookings from /Dashboard/recent-bookings:', error);
+      
+      // Fallback: try using upcoming bookings
+      try {
+        const upcomingResponse = await this.getUpcomingBookings();
+        if (upcomingResponse.Success && upcomingResponse.Data) {
+          return upcomingResponse.Data.slice(0, 10).map((booking: Booking) => ({
+            customerName: booking.EvOwnerName || booking.EvOwnerNic || 'Unknown',
+            stationLocation: booking.ChargingStationName || booking.StationLocation || 'Unknown Location',
+            timeAgo: this.getTimeAgo(booking.CreatedAt || booking.ReservationDateTime),
+          }));
+        }
+      } catch (fallbackError) {
+        console.warn('Fallback to upcoming bookings also failed:', fallbackError);
+      }
     }
+    
+    // Always return empty array if everything fails
+    return [];
   },
 
-  async getRecentBookingsWithFallback(count: number = 10): Promise<RecentBooking[]> {
+  async getUpcomingBookingsTransformed(): Promise<Booking[]> {
     try {
-      // Try test endpoint first (useful for development)
-      return await this.getTestRecentBookingsLegacy();
-    } catch (error) {
-      console.warn('Test recent bookings endpoint failed, trying production:', error);
-      const response = await this.getRecentBookings(count);
+      const response = await this.getUpcomingBookings();
       if (response.Success && response.Data) {
         return response.Data;
       }
-      throw new Error(response.Message || 'Failed to fetch recent bookings');
-    }
-  },
-
-  async getStationUtilizationWithFallback(): Promise<StationUtilization[]> {
-    try {
-      // Try test endpoint first (useful for development)
-      return await this.getTestStationUtilizationLegacy();
     } catch (error) {
-      console.warn('Test station utilization endpoint failed, trying production:', error);
-      return await this.getStationUtilizationLegacy();
+      console.warn('Upcoming bookings not available:', error);
+    }
+    
+    // Always return empty array if request fails
+    return [];
+  },
+
+  // Utility method to calculate time ago
+  getTimeAgo(dateString: string): string {
+    if (!dateString) return 'Recently';
+    
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+      if (seconds < 60) return 'Just now';
+      if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+      if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+      return date.toLocaleDateString();
+    } catch (error) {
+      return 'Recently';
     }
   },
 
-  // Enhanced dashboard data aggregation methods
+  // Main method to fetch all dashboard data
   async getEnhancedDashboardData(): Promise<{
     stats: DashboardStats;
     recentBookings: RecentBooking[];
     utilization: StationUtilization[];
-    bookingCounts: any;
     upcomingBookings: Booking[];
-    completedBookings: Booking[];
-    cancelledBookings: Booking[];
   }> {
-    const isDevelopment = import.meta.env.DEV;
-    
-    const [
-      stats,
-      recentBookings,
-      utilization,
-      bookingCounts,
-      upcomingBookings,
-      completedBookings,
-      cancelledBookings
-    ] = await Promise.all([
-      isDevelopment ? this.getStatsWithFallback() : this.getStatsLegacy(),
-      isDevelopment ? this.getRecentBookingsWithFallback() : this.getRecentBookingsLegacy(),
-      isDevelopment ? this.getStationUtilizationWithFallback() : this.getStationUtilizationLegacy(),
-      this.getBookingCountsLegacy().catch(() => null),
-      this.getUpcomingBookingsLegacy().catch(() => []),
-      this.getCompletedBookingsLegacy().catch(() => []),
-      this.getCancelledBookingsLegacy().catch(() => [])
-    ]);
+    try {
+      // Fetch all data in parallel
+      const [stats, utilization, recentBookings, upcomingBookings] = await Promise.allSettled([
+        this.getStatsTransformed(),
+        this.getStationUtilizationTransformed(),
+        this.getRecentBookingsTransformed(),
+        this.getUpcomingBookingsTransformed(),
+      ]);
 
-    return {
-      stats,
-      recentBookings,
-      utilization,
-      bookingCounts,
-      upcomingBookings,
-      completedBookings,
-      cancelledBookings
-    };
-  }
+      return {
+        stats: stats.status === 'fulfilled' ? stats.value : {
+          totalBookings: 0,
+          activeStations: 0,
+          evOwners: 0,
+          revenue: 0,
+          bookingsChange: 0,
+          evOwnersChange: 0,
+          revenueChange: 0,
+          stationsInMaintenance: 0,
+          pendingBookings: 0,
+          confirmedBookings: 0,
+          completedBookings: 0,
+        },
+        utilization: utilization.status === 'fulfilled' ? utilization.value : [],
+        recentBookings: recentBookings.status === 'fulfilled' ? recentBookings.value : [],
+        upcomingBookings: upcomingBookings.status === 'fulfilled' ? upcomingBookings.value : [],
+      };
+    } catch (error) {
+      console.error('Error fetching enhanced dashboard data:', error);
+      throw error;
+    }
+  },
 };

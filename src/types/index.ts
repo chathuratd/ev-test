@@ -157,6 +157,7 @@ export interface Booking {
   EvOwnerNic: string;
   EvOwnerName?: string;
   ChargingStationId: string;
+  ChargingStationName?: string;
   StationName?: string;
   StationLocation?: string;
   SlotNumber: number;
@@ -242,6 +243,9 @@ export interface DashboardStats {
   evOwnersChange: number;
   revenue: number;
   revenueChange: number;
+  pendingBookings?: number;
+  confirmedBookings?: number;
+  completedBookings?: number;
 }
 
 export interface BookingCounts {
@@ -329,4 +333,38 @@ export interface DeactivateStationRequest {
 export interface UpdateSlotsRequest {
   availableSlots: number;
   totalSlots: number;
+}
+
+// Backend Dashboard Stats Response
+export interface BackendDashboardStats {
+  TotalBookings: number;
+  TotalStations: number;
+  TotalEVOwners: number;
+  TotalRevenue: number;
+  PendingBookings: number;
+  ConfirmedBookings: number;
+  CompletedBookings: number;
+  ActiveStations: number;
+  InactiveStations: number;
+  AverageUtilization: number;
+}
+
+
+export interface BackendStationUtilization {
+  StationId: string;
+  StationName: string;
+  Location: string;
+  TotalSlots: number;
+  AvailableSlots: number;
+  OccupiedSlots: number;
+  UtilizationPercentage: number;
+  TotalBookings: number;
+  Revenue: number;
+}
+
+export interface BookingCounts {
+  pending: number;
+  confirmed: number;
+  completed: number;
+  cancelled: number;
 }
