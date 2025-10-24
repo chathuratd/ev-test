@@ -5,6 +5,7 @@ import {
   CreateChargingStationRequestDto, 
   UpdateChargingStationRequestDto,
   DeactivateChargingStationRequestDto,
+  ActivateChargingStationRequestDto,
   UpdateSlotAvailabilityRequestDto,
   DeactivateStationRequest,
   UpdateSlotsRequest,
@@ -135,43 +136,12 @@ export const stationService = {
     }
   },
 
-  async activateStation(id: string): Promise<void> {
-    // First check if station is inactive
-    const stationResponse = await this.getStationById(id);
-    if (stationResponse.Success && stationResponse.Data) {
-      const currentStatus = stationResponse.Data.Status?.toLowerCase();
-
-      // Only allow activation if station is inactive
-      if (currentStatus === 'active') {
-        throw new Error('Station is already active');
-      }
-
-      // Use update station endpoint to change status to Active
-      const updateRequest: UpdateChargingStationRequestDto = {
-        Id: stationResponse.Data.Id,
-        Name: stationResponse.Data.Name,
-        Location: stationResponse.Data.Location,
-        Latitude: stationResponse.Data.Latitude,
-        Longitude: stationResponse.Data.Longitude,
-        Type: stationResponse.Data.Type,
-        TotalSlots: stationResponse.Data.TotalSlots,
-        AvailableSlots: stationResponse.Data.AvailableSlots,
-        Description: stationResponse.Data.Description,
-        Amenities: stationResponse.Data.Amenities,
-        PricePerHour: stationResponse.Data.PricePerHour,
-        PowerOutput: stationResponse.Data.PowerOutput,
-        OperatorId: stationResponse.Data.OperatorId,
-        OperatingHoursDto: stationResponse.Data.OperatingHoursDto,
-        AssignedOperatorIds: stationResponse.Data.AssignedOperatorIds,
-        Status: 'Active'
-      };
-
-      const response = await this.updateStation(id, updateRequest);
-      if (!response.Success) {
-        throw new Error(response.Message || 'Failed to activate station');
-      }
-    } else {
-      throw new Error('Station not found');
-    }
+  async activateStation(id: string, activatedBy?: string, notes?: string): Promise<ApiResponse<void>> {
+    const request = {
+      ActivatedBy: activatedBy || 'system',
+      Notes: notes || ''
+    };
+    const response = await apiClient.patch<ApiResponse<void>>(`/ChargingStation/${id}/activate`, request);
+    return response.data;
   },
 };

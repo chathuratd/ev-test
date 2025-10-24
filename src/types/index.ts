@@ -145,6 +145,11 @@ export interface DeactivateChargingStationRequestDto {
   EstimatedReactivationDate?: string;
 }
 
+export interface ActivateChargingStationRequestDto {
+  ActivatedBy?: string;
+  Notes?: string;
+}
+
 export interface UpdateSlotAvailabilityRequestDto {
   StationId: string;
   AvailableSlots: number;
