@@ -72,6 +72,11 @@ export const evOwnerService = {
     return response.data;
   },
 
+  async activateEVOwner(nic: string): Promise<ApiResponse<void>> {
+    const response = await apiClient.patch<ApiResponse<void>>(`/EVOwners/${nic}/activate`);
+    return response.data;
+  },
+
   // Convenience methods that return data directly
   async registerEVOwnerDirect(registration: RegisterEVOwnerRequestDto): Promise<EVOwner> {
     const response = await this.registerEVOwner(registration);

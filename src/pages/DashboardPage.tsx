@@ -86,13 +86,13 @@ const DashboardPage: React.FC = () => {
       icon: Users,
       description: 'registered users',
     },
-    {
-      title: 'Revenue',
-      value: stats?.revenue ? `LKR ${stats.revenue.toFixed(2)}` : 'LKR 0.00',
-      change: stats?.revenueChange ?? 0,
-      icon: DollarSign,
-      description: 'total revenue',
-    },
+    // {
+    //   title: 'Revenue',
+    //   value: stats?.revenue ? `LKR ${stats.revenue.toFixed(2)}` : 'LKR 0.00',
+    //   change: stats?.revenueChange ?? 0,
+    //   icon: DollarSign,
+    //   description: 'total revenue',
+    // },
   ];
 
   // Booking status cards from stats
@@ -139,7 +139,7 @@ const DashboardPage: React.FC = () => {
       </div>
 
       {/* Main Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {statCards.map((card, index) => (
           <div key={index} className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 hover:border-zinc-700 transition-colors">
             <div className="flex items-center justify-between mb-4">
