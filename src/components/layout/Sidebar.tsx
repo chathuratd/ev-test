@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Zap, LayoutDashboard, Users, Zap as StationIcon, Calendar, Shield, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { UserRole } from '../../types';
 
 const Sidebar = () => {
   const { user, logout } = useAuth();
@@ -16,13 +17,21 @@ const Sidebar = () => {
     }
   };
 
-  const navItems = [
-    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/ev-owners', icon: Users, label: 'EV Owners' },
-    { to: '/stations', icon: StationIcon, label: 'Charging Stations' },
-    { to: '/bookings', icon: Calendar, label: 'Bookings' },
-    { to: '/users', icon: Shield, label: 'System Users' },
+  const isStationOperator = user?.Role === UserRole.StationOperator;
+
+  // Define all nav items with role-based access
+  const allNavItems = [
+    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', allowedRoles: [UserRole.Backoffice] },
+    { to: '/ev-owners', icon: Users, label: 'EV Owners', allowedRoles: [UserRole.Backoffice] },
+    { to: '/stations', icon: StationIcon, label: 'Charging Stations', allowedRoles: [UserRole.Backoffice, UserRole.StationOperator] },
+    { to: '/bookings', icon: Calendar, label: 'Bookings', allowedRoles: [UserRole.Backoffice, UserRole.StationOperator] },
+    { to: '/users', icon: Shield, label: 'System Users', allowedRoles: [UserRole.Backoffice] },
   ];
+
+  // Filter nav items based on user role
+  const navItems = allNavItems.filter(item =>
+    item.allowedRoles.includes(user?.Role as UserRole)
+  );
 
   return (
     <div className="w-64 bg-zinc-900 border-r border-zinc-800 flex flex-col h-screen fixed left-0 top-0">

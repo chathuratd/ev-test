@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Plus, Search } from 'lucide-react';
 import { userService } from '../services/userService';
-import { User, UserRole, AccountStatus } from '../types';
+import { User, UserRole, AccountStatus, CreateUserRequestDto } from '../types';
+import AddUserModal from '../components/users/AddUserModal';
 
 const UsersPage = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -93,6 +95,50 @@ const UsersPage = () => {
     }
   };
 
+  const handleAddUser = async (userData: {
+    username: string;
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    role: UserRole;
+  }) => {
+    try {
+      const createRequest: CreateUserRequestDto = {
+        Username: userData.username,
+        Email: userData.email,
+        Password: userData.password,
+        FirstName: userData.firstName,
+        LastName: userData.lastName,
+        Role: userData.role,
+        AssignedStationIds: [] // Empty for now as specified
+      };
+
+      const response = await userService.createUser(createRequest);
+      if (response.Success) {
+        fetchUsers(); // Refresh the user list
+      } else {
+        // Backend validation error from API response
+        throw new Error(response.Message || 'Failed to create user');
+      }
+    } catch (error: any) {
+      // Extract error message from backend
+      if (error.response?.data?.Message) {
+        // API returned an error with Message field
+        throw new Error(error.response.data.Message);
+      } else if (error.response?.data?.message) {
+        // API returned an error with lowercase message field
+        throw new Error(error.response.data.message);
+      } else if (error.message) {
+        // Error already has a message
+        throw error;
+      } else {
+        // Generic error
+        throw new Error('Failed to create user. Please try again.');
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -121,7 +167,7 @@ const UsersPage = () => {
             />
           </div>
           <button
-            onClick={() => alert('Add User modal not implemented yet')}
+            onClick={() => setIsAddModalOpen(true)}
             className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-black font-semibold px-4 py-2 rounded-lg transition-colors ml-4"
           >
             <Plus className="w-5 h-5" />
@@ -197,6 +243,13 @@ const UsersPage = () => {
           )}
         </div>
       </div>
+
+      {/* Add User Modal */}
+      <AddUserModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSubmit={handleAddUser}
+      />
     </div>
   );
 };
