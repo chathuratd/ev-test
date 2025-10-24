@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { Search, Filter, Calendar, Clock, MapPin, User, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { bookingService } from '../services/bookingService';
 import { stationService } from '../services/stationService';
-import { Booking, BookingStatus, ChargingStation } from '../types';
+import { Booking, BookingStatus, ChargingStation, UserRole } from '../types';
 import apiClient from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const BookingsPage = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -13,6 +14,9 @@ const BookingsPage = () => {
   const [searchInput, setSearchInput] = useState('');
   const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all'>('all');
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  const isStationOperator = user?.Role === UserRole.StationOperator;
 
   useEffect(() => {
     fetchStations();
@@ -27,21 +31,30 @@ const BookingsPage = () => {
   const fetchBookings = async () => {
     try {
       setLoading(true);
-      
-    // Build query parameters for backend filtering
-      const params = new URLSearchParams();
-    if (searchQuery) params.append('searchTerm', searchQuery);
-      if (statusFilter !== 'all') params.append('status', statusFilter);
-      params.append('page', '1');
-      params.append('pageSize', '100');
-      
-      const response = await apiClient.get(`/Booking?${params.toString()}`);
-      
-      if (response.data.Success && response.data.Data) {
-        setBookings(response.data.Data);
+
+      let response;
+
+      // Station Operators only see bookings for their assigned stations
+      if (isStationOperator && user?.Id) {
+        response = await bookingService.getBookingsByOperator(user.Id);
+      } else {
+        // Backoffice users see all bookings
+        const params = {
+          page: 1,
+          pageSize: 100,
+          status: statusFilter !== 'all' ? statusFilter : undefined
+        };
+        response = await bookingService.getAllBookings(params);
+      }
+
+      if (response.Success && response.Data) {
+        setBookings(response.Data);
+      } else {
+        setBookings([]);
       }
     } catch (error) {
       console.error('Failed to fetch bookings:', error);
+      setBookings([]);
     } finally {
       setLoading(false);
     }
@@ -49,7 +62,16 @@ const BookingsPage = () => {
 
   const fetchStations = async () => {
     try {
-      const stationsResponse = await stationService.getAllStations();
+      let stationsResponse;
+
+      // Station Operators only see their assigned stations
+      if (isStationOperator && user?.Id) {
+        stationsResponse = await stationService.getStationsByOperator(user.Id);
+      } else {
+        // Backoffice users see all stations
+        stationsResponse = await stationService.getAllStations();
+      }
+
       if (stationsResponse.Success && stationsResponse.Data) {
         setStations(stationsResponse.Data);
       }
