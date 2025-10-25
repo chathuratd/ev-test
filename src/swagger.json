@@ -362,6 +362,28 @@
         }
       }
     },
+    "/api/v1/Booking/operator/{operatorId}": {
+      "get": {
+        "tags": [
+          "Booking"
+        ],
+        "parameters": [
+          {
+            "name": "operatorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/v1/Booking/confirm": {
       "put": {
         "tags": [
@@ -734,6 +756,28 @@
         }
       }
     },
+    "/api/v1/ChargingStation/operator/{operatorId}": {
+      "get": {
+        "tags": [
+          "ChargingStation"
+        ],
+        "parameters": [
+          {
+            "name": "operatorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/v1/ChargingStation/{id}/available-slots": {
       "get": {
         "tags": [
@@ -760,6 +804,15 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "durationInMinutes",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 120
             }
           }
         ],
@@ -808,7 +861,8 @@
           "200": {
             "description": "OK"
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/api/v1/ChargingStation/{id}/deactivate": {
@@ -841,6 +895,47 @@
             "application/*+json": {
               "schema": {
                 "$ref": "#/components/schemas/DeactivateChargingStationRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/ChargingStation/{id}/activate": {
+      "patch": {
+        "tags": [
+          "ChargingStation"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivateChargingStationRequestDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivateChargingStationRequestDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivateChargingStationRequestDto"
               }
             }
           }
@@ -1632,6 +1727,20 @@
         ],
         "type": "string"
       },
+      "ActivateChargingStationRequestDto": {
+        "type": "object",
+        "properties": {
+          "ActivatedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "Notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "CancelBookingRequestDto": {
         "type": "object",
         "properties": {
@@ -1691,6 +1800,10 @@
           "ReservationDateTime": {
             "type": "string",
             "format": "date-time"
+          },
+          "DurationInMinutes": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -1942,6 +2055,11 @@
           "NewReservationDateTime": {
             "type": "string",
             "format": "date-time"
+          },
+          "NewDurationInMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         },
         "additionalProperties": false

@@ -56,8 +56,12 @@ const StationsPage: React.FC = () => {
         navigate(`/stations/${id}/deactivate`);
       } else {
         // Activate the station (only inactive stations can be activated)
-        await stationService.activateStation(id);
-        fetchStations();
+        const response = await stationService.activateStation(id);
+        if (response.Success) {
+          fetchStations();
+        } else {
+          throw new Error(response.Message || 'Failed to activate station');
+        }
       }
     } catch (error: any) {
       console.error('Failed to update station status:', error);
